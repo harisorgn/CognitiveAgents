@@ -224,14 +224,11 @@ function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     C = choices(df)
     X = stimuli(df; grid_sz, σ_conv)
 
-    #obj = (p) -> objective(X, C, p)
     obj = OptimizationFunction((p, hyperp) -> objective(X, C, p))
 
     p0 = [0.1, 0.1, 1.0]
     lb = [1e-4, 1e-4, 1e-4]
     ub = [1.0, 1.0, 15]
-
-    #sol = optimize(obj, lb, ub, p0, alg, Optim.Options(iterations=10^5))
 
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
@@ -249,13 +246,10 @@ function fit_model(df, alg, p0; σ_conv=5, grid_sz=(50,50), kwargs...)
     C = choices(df)
     X = stimuli(df; grid_sz, σ_conv)
 
-    #obj = (p) -> objective(X, C, p)
     obj = OptimizationFunction((p, hyperp) -> objective(X, C, p))
 
     lb = [1e-4, 1e-4, 1e-4]
     ub = [1.0, 1.0, 15]
-
-    #sol = optimize(obj, lb, ub, p0, alg, Optim.Options(iterations=10^5))
 
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
