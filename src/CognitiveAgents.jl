@@ -24,7 +24,7 @@ using ColorSchemes
 
 include("utils.jl")
 include("read.jl")
-include("EM_learning.jl")
+include("EMAgent.jl")
 include("discrete_evidence.jl")
 include("CategoryLearnEnv.jl")
 include("plot.jl")
