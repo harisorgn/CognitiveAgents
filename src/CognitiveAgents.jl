@@ -26,6 +26,7 @@ include("utils.jl")
 include("read.jl")
 include("EM_learning.jl")
 include("discrete_evidence.jl")
+include("CategoryLearnEnv.jl")
 include("plot.jl")
 
 export read_data_bipolar, read_data_psychopy, read_data_js
