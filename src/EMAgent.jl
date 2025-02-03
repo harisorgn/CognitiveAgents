@@ -257,8 +257,6 @@ function act(agent::EMAgent, stimulus)
     return choice
 end
 
-optimize!(agent::EMAgent, stimulus, correct_category) = M_step!(agent, stimulus, correct_category)
-
 function run_trial!(agent::EMAgent, env::CategoryLearnEnv, t)
     stimulus = observe(env)
     t = current_trial(env)
