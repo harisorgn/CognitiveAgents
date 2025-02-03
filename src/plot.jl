@@ -171,7 +171,7 @@ function figure_group_accuracy(df, N_trials_per_set, session; save_plot=false)
 end
 
 function plot_RT!(ax, df; color=:black)
-    RT = response_times(df)
+    RT = get_response_times(df)
 
     hist!(ax, RT; bins=50, color = (color, 0.3))
     vlines!(ax, median(RT); linestyle = :dash, linewidth = 2, color)
@@ -320,7 +320,7 @@ function figure_cumulative_RT(df, session, xs; save_plot=false)
 end
 
 function plot_RT_aggressiveness!(ax, df, aggressiveness; color=:black, kwargs...)
-    RT = response_times(df)
+    RT = get_response_times(df)
     score = sort(unique(aggressiveness))
     N_faces = length(aggressiveness)
     N_runs = length(RT) ÷ N_faces 
@@ -386,7 +386,7 @@ function figure_RT_aggressiveness(df, aggressiveness, session; save_plot=false)
 end
 
 function plot_acc_aggressiveness!(ax, df, aggressiveness; color=:black, kwargs...)
-    c = corrects(df)
+    c = get_corrects(df)
     score = sort(unique(aggressiveness))
     N_faces = length(aggressiveness)
     N_runs = length(c) ÷ N_faces 

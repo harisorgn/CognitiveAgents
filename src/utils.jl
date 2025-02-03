@@ -30,15 +30,15 @@ function convolution(IMG; σ=1)
     return C
 end
 
-correct_categories(df::DataFrame) = occursin.("right", df.correct_response)
+get_corrects(df) = map(x -> occursin("True", x) ? true : false, df.correct) 
 
-corrects(df) = map(x -> occursin("True", x) ? true : false, df.correct) 
+get_choices(df) = Int.(occursin.("right", df.response))
 
-choices(df) = occursin.("right", df.response)
+get_choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
 
-choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
+get_correct_categories(df::DataFrame) = Int.(occursin.("right", df.correct_response))
 
-function response_times(df)
+function get_get_response_times(df)
     RT = df.response_time
     r = Vector{Union{Float64, Missing}}(undef, length(RT))
 
@@ -55,7 +55,7 @@ function response_times(df)
     return r
 end
 
-function stimuli(df::DataFrame; σ_conv=1, grid_sz=(50,50))
+function get_stimuli(df::DataFrame; σ_conv=1, grid_sz=(50,50))
     X = mapreduce(hcat, eachrow(df)) do r
         set = parse(Int, r.set)
         cat = parse(Int, r.category)
@@ -83,7 +83,7 @@ function loglikelihood_dots(df::DataFrame)
 end
 
 function response_dots(df::DataFrame; inter_dot_interval = 0.55)
-    RT = response_times(df)
+    RT = get_response_times(df)
     dots = div.(RT, inter_dot_interval, RoundDown)
 
     return Int.(dots)

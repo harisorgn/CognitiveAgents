@@ -17,7 +17,7 @@ function add_data!(df, df_aggressive)
     N_faces = nrow(df_aggressive)
 
     df.choice = choicesp1(df)
-    df.rt = response_times(df)
+    df.rt = get_response_times(df)
     df.score = repeat(df_aggressive.score, Int(nrow(df) / N_faces))
 end
 

@@ -1,6 +1,6 @@
 mutable struct CategoryLearnEnv <: AbstractEnv
     const S::Matrix{Float64}
-    const CAT::Vector{Int}
+    const C::Vector{Int}
     const N_trials::Int
     current_trial::Int
     
@@ -8,6 +8,10 @@ mutable struct CategoryLearnEnv <: AbstractEnv
         S = transpose(Matrix(stimuli[!, Not(:category)]))
         C = stimuli[!, :category]
 
+        new(S, C, length(C), 1)
+    end
+
+    function CategoryLearnEnv(S::AbstractMatrix, C::AbstractVector)
         new(S, C, length(C), 1)
     end
 end
@@ -23,3 +27,7 @@ CommonRLInterface.observe(env::CategoryLearnEnv) = env.S[:, env.current_trial]
 CommonRLInterface.terminated(env::CategoryLearnEnv) = env.current_trial > env.N_trials
 
 CommonRLInterface.act!(env::CategoryLearnEnv, action) = action == env.C[env.current_trial]
+
+increment!(env::CategoryLearnEnv) = env.current_trial += 1
+
+current_trial(env::CategoryLearnEnv) = env.current_trial

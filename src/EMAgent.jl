@@ -1,12 +1,13 @@
 mutable struct EMAgent
     W::Matrix{Float64}
-    X̄::Matrix{Float64}
+    S̄::Matrix{Float64}
     N::Vector{Int}
     logq::Vector{Float64}
     logq_stim::Vector{Float64} # log P(z|stim) posterior without category info
     loglhood_stim::Vector{Float64}
     z::Vector{Int}
     z_stim::Vector{Int}
+    const N_loops::Int
     const L_data::Vector{Float64}
     const α::Float64
     const β::Float64
@@ -14,7 +15,7 @@ mutable struct EMAgent
     const ηₓ::Float64
     const σ²::Float64
 
-    function EMAgent(X; α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=1)
+    function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=1)
         D, N_trials = size(X)
         logq = zeros(1)
         logq_stim = zeros(1)
@@ -23,14 +24,12 @@ mutable struct EMAgent
         z = Int[]
         z_stim = Int[]
         W = zeros(D, 1)
-        X̄ = zeros(D, 1)
+        S̄ = zeros(D, 1)
         loglikelihood_data = zeros(N_trials)
 
-        new(W, X̄, N, logq, logq_stim, loglhood_stim, z, z_stim, loglikelihood_data, α, β, η, ηₓ, σ²)
+        new(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ²)
     end
 end
-
-
 
 struct TrialMetrics
     W::Vector{Matrix{Float64}}
@@ -70,7 +69,7 @@ function reset!(ag::EMAgent)
 end
 
 function update_latent_factor!(zs, logq)
-    zₜ = findfirst(x -> x == maximum(logq), logq)
+    zₜ = argmax(logq)
     push!(zs, zₜ)
 end
 
@@ -89,15 +88,15 @@ function local_MAP!(agent::EMAgent, x)
         push!(agent.loglhood_stim, 0)
 
         agent.W = hcat(agent.W, zeros(D))
-        agent.X̄ = hcat(agent.X̄, zeros(D))
+        agent.S̄ = hcat(agent.S̄, zeros(D))
     end
 
     agent.N[zₜ] += 1
-    agent.X̄[:, zₜ] .+= agent.ηₓ * (log.(x) - agent.X̄[:, zₜ])
+    agent.S̄[:, zₜ] .+= agent.ηₓ * (log.(x) - agent.S̄[:, zₜ])
 end
 
-function E_step!(agent::EMAgent, x, c, t)
-    @unpack W, X̄, N, z, logq, α, β, ηₓ = agent
+function E_step!(agent::EMAgent, stim, correct_category, t)
+    @unpack W, S̄, N, z, logq, α, β, ηₓ = agent
 
     K = length(logq)
 
@@ -106,11 +105,11 @@ function E_step!(agent::EMAgent, x, c, t)
 
     for k in Base.OneTo(K)
         logpriors[k] = k == K ? log(α) : logprior(k, z, t; β)
-        loglhood_stim = loglikelihood_stimulus(x, X̄[:,k], N[k]; σ²=agent.σ²)
+        loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
         agent.loglhood_stim[k] = loglhood_stim
 
-        P = probability_cat1(x, W[:,k])
-        loglhood_category[k] = loglikelihood_category(P, c) 
+        P = probability_cat1(stim, W[:,k])
+        loglhood_category[k] = loglikelihood_category(P, correct_category) 
 
         agent.logq[k] = loglhood_stim + loglhood_category[k]
         agent.logq_stim[k] = loglhood_stim
@@ -125,35 +124,81 @@ function E_step!(agent::EMAgent, x, c, t)
     agent.logq_stim .-= logsumexp(agent.logq_stim)
 end
 
-function prediction_error(cat, pred_cat, η, logq)
-    q = exp(logq)
+function E_step_stimulus!(agent::EMAgent, stim, t)
+    @unpack W, S̄, N, z, logq, α, β, ηₓ = agent
 
-    return η * q * (cat - pred_cat)
+    K = length(logq)
+
+    logpriors = similar(logq)
+
+    for k in Base.OneTo(K)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; β)
+        loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
+        agent.loglhood_stim[k] = loglhood_stim
+
+        agent.logq_stim[k] = loglhood_stim
+    end
+    
+    logpriors .-= logsumexp(logpriors)   
+
+    agent.logq_stim .+= logpriors
+    agent.logq_stim .-= logsumexp(agent.logq_stim)
 end
 
-function M_step!(agent::EMAgent, x, c)
+function E_step_category!(agent::EMAgent, stim, correct_category, t)
+    @unpack W, S̄, N, z, logq, α, β, ηₓ = agent
+
+    K = length(logq)
+
+    logpriors = similar(logq)
+    loglhood_category = zeros(K)
+
+    for k in Base.OneTo(K)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; β)
+        loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
+        agent.loglhood_stim[k] = loglhood_stim
+
+        P = probability_cat1(stim, W[:,k])
+        loglhood_category[k] = loglikelihood_category(P, correct_category) 
+
+        agent.logq[k] = loglhood_stim + loglhood_category[k]
+    end
+    
+    logpriors .-= logsumexp(logpriors)   
+
+    agent.logq .+= logpriors 
+    agent.logq .-= logsumexp(logq)
+end
+
+function prediction_error(correct_cat, predicted_cat, η, logq)
+    q = exp(logq)
+
+    return η * q * (correct_cat - predicted_cat)
+end
+
+function M_step!(agent::EMAgent, stim, correct_cat)
     for k in eachindex(agent.logq)
-        pred_c = probability_cat1(x, agent.W[:,k])
-        agent.W[:,k] .+= x .* prediction_error(c, pred_c, agent.η, agent.logq[k])
+        predicted_cat = probability_cat1(stim, agent.W[:,k])
+        agent.W[:,k] .+= stim .* prediction_error(correct_cat, predicted_cat, agent.η, agent.logq[k])
     end
 end
 
-function loglikelihood_stimulus(x, x̄, N; σ²=1)
+function loglikelihood_stimulus(stim, S̄, N; σ²=1)
     μ₀ = -2
     σ₀² = 1
 
-    x̂ = (x̄ * N * σ₀² .+ μ₀ * σ²) / (N*σ₀² + σ²)
+    ŝ = (S̄ * N * σ₀² .+ μ₀ * σ²) / (N*σ₀² + σ²)
     ν² = σ² + (σ² * σ₀²) / (N*σ₀² + σ²)
 
-    Nₓ = length(x)
+    Nₛ = length(stim)
     
-    loglhood = - Nₓ*log(2*pi*ν²)/2 - sum(log.(x)) - sum((log.(x) .- x̂).^2 / (2*ν²))
-    #loglhood = - Nₓ*log(2*pi*ν²)/2 - sum((x .- x̂).^2 / (2*ν²))
+    loglhood = - Nₛ*log(2*pi*ν²)/2 - sum(log.(stim)) - sum((log.(stim) .- ŝ).^2 / (2*ν²))
+    #loglhood = - Nₛ*log(2*pi*ν²)/2 - sum((stim .- ŝ).^2 / (2*ν²))
 
     return loglhood
 end
 
-probability_cat1(x, w) = logistic(w' * x)
+probability_cat1(stim, w) = logistic(w' * stim)
 
 function loglikelihood_category(P_cat1, cat)
     return cat * log(P_cat1 + eps()) + (1 - cat) * log(1 - P_cat1 + eps())
@@ -165,35 +210,36 @@ function logprior(k, z, t; β=1)
     return log(sum(kernel.(Ref(t), t_past[z .== k]; β)))
 end
 
-function loglikelihood(agent::EMAgent, x::AbstractVector, c::Real)
+function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
     @unpack W, logq_stim, logq = agent
 
     K = length(logq)
 
     loglhood_category = map(Base.OneTo(K)) do k    
-        P = probability_cat1(x, W[:,k])
-        loglikelihood_category(P, c) 
+        P = probability_cat1(stim, W[:,k])
+        loglikelihood_category(P, choice_cat) 
     end
     
-    L_data = logsumexp(logq_stim .+ loglhood_category) # log ∑ᶻ P(category|z) * P(z|stim)
+    L_data = logsumexp(loglhood_category .+ logq_stim) # log ∑ᶻ P(category|z) * P(z|stim)
 
     return L_data
 end
 
-function loglikelihood(agent::EMAgent, X::AbstractMatrix, C::AbstractVecOrMat; N_loops=1)
+function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
     D, N_trials = size(X)
 
     L_data = 0
 
     for t in Base.OneTo(N_trials)
-        stimulus = X[:,t]
-        category = C[t]
+        stimulus = S[:,t]
+        choice_cat = choices[t]
+        correct_cat = corrects[t]
 
         loglikelihood_trial = 0
         for _ in Base.OneTo(N_loops)
-            E_step!(agent, stimulus, category, t)
-            loglikelihood_trial = loglikelihood(agent, stimulus, category)
-            M_step!(agent, stimulus, category)
+            E_step!(agent, stimulus, correct_cat, t)
+            loglikelihood_trial = loglikelihood(agent, stimulus, choice_cat)
+            M_step!(agent, stimulus, correct_cat)
         end
         local_MAP!(agent, stimulus)
 
@@ -201,6 +247,48 @@ function loglikelihood(agent::EMAgent, X::AbstractMatrix, C::AbstractVecOrMat; N
     end
 
     return L_data
+end
+
+function act(agent::EMAgent, stimulus)
+    z_stim_t = argmax(agent.logq_stim)
+    P = probability_cat1(stimulus, agent.W[:, z_stim_t])
+    action = Int(rand(Bernoulli(P))) + 1
+
+    return action
+end
+
+optimize!(agent::EMAgent, stimulus, correct_category) = M_step!(agent, stimulus, correct_category)
+
+function run_trial!(agent::EMAgent, env::CategoryLearnEnv, t)
+    stimulus = observe(env)
+    t = current_trial(env)
+
+    E_step_stimulus!(agent, stimulus, t)
+    
+    choice = act(agent, stimulus)
+
+    correct_category = act!(env, choice)
+
+    M_step!(agent, stimulus, correct_category)
+
+    E_step_category!(agent, stimulus, correct_category, t)
+
+    local_MAP!(agent, stimulus)
+
+    increment!(env)
+
+    return choice
+end
+
+function run_task!(agent, env)
+    N_trials = env.N_trials
+
+    choices = zeros(Int, N_trials)
+    for t in Base.OneTo(N_trials)
+        choices[t] = run_trial!(agent, env, t)
+    end
+
+    return choices
 end
 
 initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=1, σ²=1)
@@ -224,6 +312,10 @@ function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     C = choices(df)
     X = stimuli(df; grid_sz, σ_conv)
 
+    return fit_model(X, C, alg; σ_conv, grid_sz, kwargs...)
+end
+
+function fit_model(X::AbstractMatrix, C::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     obj = OptimizationFunction((p, hyperp) -> objective(X, C, p))
 
     p0 = [0.1, 0.1, 1.0]
