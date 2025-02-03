@@ -252,9 +252,9 @@ end
 function act(agent::EMAgent, stimulus)
     z_stim_t = argmax(agent.logq_stim)
     P = probability_cat1(stimulus, agent.W[:, z_stim_t])
-    action = Int(rand(Bernoulli(P))) + 1
+    choice = Int(rand(Bernoulli(P)))
 
-    return action
+    return choice
 end
 
 optimize!(agent::EMAgent, stimulus, correct_category) = M_step!(agent, stimulus, correct_category)
@@ -293,10 +293,10 @@ end
 
 initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=1, σ²=1)
 
-function objective(X, C, p)
-    ag = initialise_agent(X, p) 
+function objective(S, choices, corrects, p)
+    agent = initialise_agent(S, p) 
     
-    return - loglikelihood(ag, X, C)
+    return - loglikelihood(agent, S, choices, corrects)
 end
 
 struct CLResult
@@ -309,37 +309,17 @@ struct CLResult
 end
 
 function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
-    C = choices(df)
-    X = stimuli(df; grid_sz, σ_conv)
+    choices = get_choices(df)
+    corrects = get_correct_categories(df)
+    S = stimuli(df; grid_sz, σ_conv)
 
-    return fit_model(X, C, alg; σ_conv, grid_sz, kwargs...)
+    return fit_model(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
 end
 
-function fit_model(X::AbstractMatrix, C::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
-    obj = OptimizationFunction((p, hyperp) -> objective(X, C, p))
+function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+    obj = OptimizationFunction((p, hyperp) -> objective(S, choices, corrects, p))
 
     p0 = [0.1, 0.1, 1.0]
-    lb = [1e-4, 1e-4, 1e-4]
-    ub = [1.0, 1.0, 15]
-
-    prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
-    sol = solve(prob, alg; kwargs...)
-    
-    id = only(unique(df.subject_id))
-    session = only(unique(df.session))
-    run = only(unique(df.run))
-
-    res = CLResult(sol, grid_sz, σ_conv, id, session, run)
-
-    return res
-end
-
-function fit_model(df, alg, p0; σ_conv=5, grid_sz=(50,50), kwargs...)
-    C = choices(df)
-    X = stimuli(df; grid_sz, σ_conv)
-
-    obj = OptimizationFunction((p, hyperp) -> objective(X, C, p))
-
     lb = [1e-4, 1e-4, 1e-4]
     ub = [1.0, 1.0, 15]
 
