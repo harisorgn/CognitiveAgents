@@ -32,9 +32,10 @@ grid_sz = (50,50)
 
 df_subj = subset(df, :subject_id => id -> id .== IDs[1], :run => r -> r.==1, :session => s -> s.== "bhb")
 
-C = get_correct_categories(df_subj)
 S = get_stimuli(df_subj; grid_sz, σ_conv)
-env = CategoryLearnEnv(S, C)
+corrects = get_correct_categories(df_subj)
+choices = get_choices(df_subj)
+env = CategoryLearnEnv(S, corrects)
 
 η = 0.2
 ηₓ = 0.15
@@ -44,4 +45,4 @@ agent = EMAgent(S; η, ηₓ, α)
 choices = run_task!(agent, env)
 
 alg = NLopt.GN_MLSL_LDS()
-res = fit_model(S, choices, alg; grid_sz, σ_conv)
+res = fit_model(S, choices, corrects, alg; grid_sz, σ_conv)
