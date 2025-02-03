@@ -226,7 +226,7 @@ function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
 end
 
 function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
-    D, N_trials = size(X)
+    D, N_trials = size(S)
 
     L_data = 0
 
