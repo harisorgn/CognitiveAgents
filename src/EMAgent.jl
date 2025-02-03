@@ -237,8 +237,9 @@ function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVecto
 
         loglikelihood_trial = 0
         for _ in Base.OneTo(N_loops)
-            E_step!(agent, stimulus, correct_cat, t)
+            E_step_stimulus!(agent, stimulus, t)
             loglikelihood_trial = loglikelihood(agent, stimulus, choice_cat)
+            E_step_category!(agent, stimulus, correct_cat, t)
             M_step!(agent, stimulus, correct_cat)
         end
         local_MAP!(agent, stimulus)
