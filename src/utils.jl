@@ -38,7 +38,7 @@ get_choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
 
 get_correct_categories(df::DataFrame) = Int.(occursin.("right", df.correct_response))
 
-function get_get_response_times(df)
+function get_response_times(df)
     RT = df.response_time
     r = Vector{Union{Float64, Missing}}(undef, length(RT))
 
