@@ -1,6 +1,7 @@
 using CognitiveAgents
 using DataFrames
 using OptimizationNLopt
+using OptimizationBBO
 
 cols = [
     :subject_id,
@@ -45,4 +46,5 @@ agent = EMAgent(S; η, ηₓ, α)
 choices = run_task!(agent, env)
 
 alg = NLopt.GN_MLSL_LDS()
+#alg = BBO_adaptive_de_rand_1_bin_radiuslimited()
 res = fit_model(S, choices, corrects, alg; grid_sz, σ_conv)
