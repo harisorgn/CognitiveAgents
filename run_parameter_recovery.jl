@@ -31,7 +31,7 @@ IDs = unique(df.subject_id)
 σ_conv = 10
 grid_sz = (50,50)
 
-df_subj = subset(df, :subject_id => id -> id .== IDs[1], :run => r -> r.==1, :session => s -> s.== "bhb")
+df_subj = subset(df, :subject_id => id -> id .== IDs[1], :run => r -> r.==1)
 
 S = get_stimuli(df_subj; grid_sz, σ_conv)
 corrects = get_correct_categories(df_subj)
