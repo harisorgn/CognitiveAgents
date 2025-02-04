@@ -4,9 +4,9 @@ mutable struct CategoryLearnEnv <: AbstractEnv
     const N_trials::Int
     current_trial::Int
     
-    function CategoryLearnEnv(stimuli::DataFrame)
-        S = transpose(Matrix(stimuli[!, Not(:category)]))
-        C = stimuli[!, :category]
+    function CategoryLearnEnv(df::DataFrame)
+        S = transpose(Matrix(df[!, Not(:category)]))
+        C = df[!, :category]
 
         new(S, C, length(C), 1)
     end
@@ -26,7 +26,11 @@ CommonRLInterface.observe(env::CategoryLearnEnv) = env.S[:, env.current_trial]
 
 CommonRLInterface.terminated(env::CategoryLearnEnv) = env.current_trial > env.N_trials
 
-CommonRLInterface.act!(env::CategoryLearnEnv, action) = action == env.C[env.current_trial]
+# For now acting on the environment only returns a reward
+# and does not increment! the environment forward as `CommonRLInterface` dictates.
+# This is done because of N_loops in EMAgent, 
+# where we don't want to increment! the environment on every loop. 
+CommonRLInterface.act!(env::CategoryLearnEnv, action) = env.C[env.current_trial]
 
 increment!(env::CategoryLearnEnv) = env.current_trial += 1
 
