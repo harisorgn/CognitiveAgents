@@ -273,7 +273,7 @@ function run_trial!(agent::EMAgent, env::CategoryLearnEnv, t)
     E_step_category!(agent, stimulus, correct_category, t)
 
     local_MAP!(agent, stimulus)
-
+ 
     increment!(env)
 
     return choice
@@ -292,10 +292,10 @@ end
 
 initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=1, σ²=1)
 
-function objective(S, choices, corrects, p)
+function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
     agent = initialise_agent(S, p) 
     
-    return - loglikelihood(agent, S, choices, corrects)
+    return -loglikelihood(agent, S, choices, corrects)
 end
 
 struct CLResult
@@ -315,7 +315,7 @@ function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     return fit_model(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
 end
 
-function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), id=0, session="paramete_recovery", run=0, kwargs...)
     obj = OptimizationFunction((p, hyperp) -> objective(S, choices, corrects, p))
 
     p0 = [0.1, 0.1, 1.0]
@@ -324,10 +324,6 @@ function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::Abstrac
 
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
-    
-    id = only(unique(df.subject_id))
-    session = only(unique(df.session))
-    run = only(unique(df.run))
 
     res = CLResult(sol, grid_sz, σ_conv, id, session, run)
 
