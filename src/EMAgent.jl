@@ -290,7 +290,7 @@ function run_task!(agent, env)
     return choices
 end
 
-initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=1, σ²=1)
+initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=1, β=1, σ²=2)
 
 function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
     agent = initialise_agent(S, p) 
@@ -307,6 +307,10 @@ struct CLResult
     run
 end
 
+struct GridSearch
+    step_size::Float64
+end
+
 function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
@@ -318,13 +322,26 @@ end
 function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), id=0, session="paramete_recovery", run=0, kwargs...)
     obj = OptimizationFunction((p, hyperp) -> objective(S, choices, corrects, p))
 
-    p0 = [0.1, 0.1, 1.0]
-    lb = [1e-4, 1e-4, 1e-4]
-    ub = [1.0, 1.0, 15]
+    p0 = [0.1, 0.1]
+    lb = [1e-5, 1e-5]
+    ub = [1.0, 1.0]
+    
+    if alg isa GridSearch
+        step_sz = alg.step_size
+        r1 = lb[1]:step_sz:ub[1]
+        r2 = lb[2]:step_sz:ub[2]
+        OBJ = zeros(length(r1), length(r2))
+        for (i, p1) in enumerate(r1)
+            for (j, p2) in enumerate(r2)
+                OBJ[i, j] = obj([p1, p2], nothing)
+            end
+        end
 
-    prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
-    sol = solve(prob, alg; kwargs...)
-
+        sol = OBJ
+    else
+        prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
+        sol = solve(prob, alg; kwargs...)
+    end
     res = CLResult(sol, grid_sz, σ_conv, id, session, run)
 
     return res

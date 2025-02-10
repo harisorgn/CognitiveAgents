@@ -13,6 +13,8 @@ using DataFrames
 
 using LogExpFunctions: logsumexp, logistic
 
+using Statistics: mean, std
+
 using Images: load, imresize, Gray
 
 using UnPack
@@ -30,7 +32,7 @@ include("plot.jl")
 
 export read_data_bipolar, read_data_psychopy, read_data_js 
 export get_choices, get_correct_categories, get_stimuli, get_response_times
-export CLResult, CMResult, EMAgent, CategoryLearnEnv
-export initialise_agent, fit_model, run_trial!, run_task!
+export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
+export initialise_agent, objective, fit_model, run_trial!, run_task!
 
 end 
