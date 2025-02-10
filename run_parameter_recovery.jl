@@ -28,23 +28,22 @@ filter!(r -> r.phase == "test", df)
 
 IDs = unique(df.subject_id)
 
-σ_conv = 10
+σ_conv = 5
 grid_sz = (50,50)
 
 df_subj = subset(df, :subject_id => id -> id .== IDs[1], :run => r -> r.==1)
 
 S = get_stimuli(df_subj; grid_sz, σ_conv)
 corrects = get_correct_categories(df_subj)
-choices = get_choices(df_subj)
 env = CategoryLearnEnv(S, corrects)
 
-η = 0.2
-ηₓ = 0.15
-α = 2
-agent = EMAgent(S; η, ηₓ, α)
+η = 0.05
+ηₓ = 0.05
+α = 1
+agent = EMAgent(S; η, ηₓ, α, σ²=2)
 
 choices = run_task!(agent, env)
 
-alg = NLopt.GN_MLSL_LDS()
-#alg = BBO_adaptive_de_rand_1_bin_radiuslimited()
+#alg = NLopt.GN_MLSL_LDS()
+alg = GridSearch(0.01)
 res = fit_model(S, choices, corrects, alg; grid_sz, σ_conv)
