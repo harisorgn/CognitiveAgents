@@ -1,39 +1,35 @@
-function plot_inferred_rules(agent, filename)
-    f = Figure()
-    ax = CairoMakie.Axis(f[1,1], xticks=0:20:100)
-    lines!(ax, agent.z)
-    
-    save(string(filename, ".png"), f, pt_per_unit=1)
-end
-
-function plot_subject_accuracy(df, N_trials_per_set; name="", save_plot=false, title="", N_training=0)
+function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)); name="", save_plot=false, title="")
     IDs = unique(df[!, :subject_id])    
     sets = unique(df[!, :set])
 
     colormap = ColorSchemes.seaborn_bright.colors
 
+    N_points_per_set = N_trials_per_set / N_trials_average
+    xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
+    
     f = Figure(;size = (1024, 768), fontsize=30)
     ax = Axis(
         f[1, 1], 
         title = title,
         ylabel = "Accuracy",
-        xticks = (8:16:60, ["Set 1", "Set 2", "Set 3", "Set 4"])
+        xticks = (xlabel_ticks , ["Set 1", "Set 2", "Set 3", "Set 4"])
     )
     hidexdecorations!(ax, ticklabels = false)
-    xs = collect(1:N_trials_per_set)
 
     for (i,ID) in enumerate(IDs)
+        xs = collect(1:N_points_per_set)
         for (j,s) in enumerate(sets)
-            corrects = parse.(Bool, df[(df.subject_id .== ID) .& (df.set .== s), :correct])
-            acc = mean.(partition(corrects, 5, 1))
-            xs = collect(1:length(acc)) .+ (j-1)*(length(acc) + 1)
-            
+            choices = parse.(Bool, df[(df.subject_id .== ID) .& (df.set .== s), :correct])
+            acc = mean.(partition(choices, N_trials_average))
+        
             scatter!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
             lines!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
+            
+            xs .+= N_points_per_set
         end
     end
 
-    vlines!(ax, collect(20:20:80), linestyle = :dash, linewidth = 2, color=:gray)
+    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
 
     if save_plot
@@ -88,7 +84,7 @@ function plot_group_accuracy_per_set(df, N_trials_per_set; name="", save_plot=fa
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
 
     if save_plot
-        save(string("group_acc_", name, ".png"), f, pt_per_unit=1)
+        save(string("group_acc_per_set_", name, ".png"), f, pt_per_unit=1)
     end
 
     f
@@ -128,6 +124,32 @@ function group_accuracy!(ax, df, N_trials_per_set; color=:black, kwargs...)
     lines!(ax, xs, μ_group, color=(color, 1); kwargs...)
     band!(ax, xs, μ_group .- σ_group, μ_group .+ σ_group, color=(color, 0.3))
 
+end
+
+function plot_group_accuracy(df, N_trials_per_set=20; name="", label="", save_plot=false)
+    colormap = ColorSchemes.seaborn_bright.colors
+    
+    f = Figure(;size = (1024, 768), fontsize=30)
+    ax = Axis(
+        f[1, 1], 
+        title = "",
+        xlabel = "Trial",
+        ylabel = "Accuracy",
+        yticks = 0.0:0.2:1.0
+    )
+
+    group_accuracy!(ax, df, N_trials_per_set; color=colormap[1], label)
+
+    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
+    ylims!(ax, 0, 1)
+
+    f[1, 2] = Legend(f, ax, framevisible = false)
+
+    if save_plot
+        save(string("group_acc_", name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
 end
 
 function figure_group_accuracy(df, N_trials_per_set, session; save_plot=false)
