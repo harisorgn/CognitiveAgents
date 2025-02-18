@@ -32,9 +32,9 @@ end
 solution_to_params(sol) = (β = sol[1], σ_inf = sol[2])
 
 function fit_model(df, alg; kwargs...)
-    L = loglikelihood_dots(df)
-    C = choicesp1(df)
-    RD = response_dots(df)
+    L = get_loglikelihood_dots(df)
+    C = get_choicesp1(df)
+    RD = get_response_dots(df)
 
     obj = OptimizationFunction(
         (p, hyperp) -> objective(p, L, C, RD)
@@ -54,8 +54,8 @@ function results_to_regressors(res::CMResult, df; inter_dot_interval = 0.55)
     ST = parse.(Float64, df_fit.stim_presentation_time)
     RT = parse.(Float64, df_fit.response_time)
 
-    RD = response_dots(df_fit)
-    L = loglikelihood_dots(df_fit)
+    RD = get_response_dots(df_fit)
+    L = get_loglikelihood_dots(df_fit)
     C = choicesp1(df_fit)
 
     β, σ_inf = res.sol

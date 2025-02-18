@@ -72,7 +72,7 @@ function get_stimuli(df::DataFrame; σ_conv=1, grid_sz=(50,50))
     return X
 end
 
-function loglikelihood_dots(df::DataFrame)
+function get_loglikelihood_dots(df::DataFrame)
     map(eachrow(df)) do r
         set = parse(Int, r.set)
         cat = parse(Int, r.category)
@@ -82,7 +82,7 @@ function loglikelihood_dots(df::DataFrame)
     end
 end
 
-function response_dots(df::DataFrame; inter_dot_interval = 0.55)
+function get_response_dots(df::DataFrame; inter_dot_interval = 0.55)
     RT = get_response_times(df)
     dots = div.(RT, inter_dot_interval, RoundDown)
 
