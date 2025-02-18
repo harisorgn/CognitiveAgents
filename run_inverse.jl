@@ -34,7 +34,7 @@ cols = [
     :version
 ]
 
-task = "task1"
+task = "task2"
 dir = joinpath("./data", "bipolar")
 files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 
@@ -43,27 +43,19 @@ filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 df = read_data_bipolar(files, cols)
 filter!(r -> r.phase == "test", df)
 
-IDs = unique(df.subject_id)
-
-σ_conv = 10
-grid_sz = (50,50)
-
-algs = [NLopt.GN_MLSL_LDS()]
+#IDs = unique(df.subject_id)
+IDs = [9, 36, 38, 40, 41, 43]
+alg = NLopt.GN_MLSL_LDS()
 
 session = "glc"
 run = 1
+for ID in IDs
+    df_fit = df[(df.subject_id .== ID) .& (df.run .== run) .& (df.session .== session), :]
+    res = fit_model(df, alg)
 
-fit_batch(IDs, session, run, algs, grid_sz, σ_conv; maxiters=100_000, local_method=NLopt.LN_COBYLA())
+    filename = "CL_res_subj-$(ID)_ses-$(session)_run-$(run).jls"
+    serialize(filename, res)
+end
 
-run = 2
-
-fit_batch(IDs, session, run, algs, grid_sz, σ_conv; maxiters=100_000, local_method=NLopt.LN_COBYLA())
-
-session = "bhb"
-run = 1
-
-fit_batch(IDs, session, run, algs, grid_sz, σ_conv; maxiters=100_000, local_method=NLopt.LN_COBYLA())
-
-run = 2
-
-fit_batch(IDs, session, run, algs, grid_sz, σ_conv; maxiters=100_000, local_method=NLopt.LN_COBYLA())
+σ_conv = 10
+grid_sz = (50,50)
