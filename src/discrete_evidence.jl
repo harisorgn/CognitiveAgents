@@ -31,7 +31,7 @@ end
 
 solution_to_params(sol) = (β = sol[1], σ_inf = sol[2])
 
-function fit_model(df; kwargs...)
+function fit_model(df, alg; kwargs...)
     L = loglikelihood_dots(df)
     C = choicesp1(df)
     RD = response_dots(df)
@@ -41,7 +41,7 @@ function fit_model(df; kwargs...)
     )
     p0 = [1.0, 0.5]
     prob = OptimizationProblem(obj, p0, lb = [0.0, 0.0], ub = [100.0, 100.0])
-    sol = solve(prob, BBO_adaptive_de_rand_1_bin(); kwargs...)
+    sol = solve(prob, alg; kwargs...)
 
     return CMResult(sol, only(unique(df.subject_id)), only(unique(df.session)), only(unique(df.run)))
 end
