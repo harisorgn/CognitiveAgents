@@ -13,6 +13,7 @@ using CSV
 using DataFrames
 
 using LogExpFunctions: logsumexp, logistic
+using NNlib: softmax
 
 using Statistics: mean, std
 
