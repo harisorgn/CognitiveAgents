@@ -1,3 +1,26 @@
+@model function discrete_evidence(response_dots, dot_evidence, choices)
+    #σ ~ InverseGamma(2,8)
+    β ~ Uniform(0, 100)
+    P_lapse ~ Beta(1, 5)
+
+    N_trials = length(response_dots)
+    for t in Base.OneTo(N_trials)
+        RD = response_dots[t]
+        evidence = dot_evidence[t]
+        z_left, z_right = sum(evidence[1:RD, :]; dims=1)
+
+        #β = pi / (σ * sqrt(6*(RD - 1)))
+        P_left = logistic(β * (z_left - z_right))
+        P_choices = [P_left, 1 - P_left]
+      
+        choice_idx = choices[t] + 1
+        P_choice = P_choices[choice_idx] * (1 - P_lapse) + P_lapse / 2
+        choices[t] ~ Bernoulli(P_choice)
+    end
+
+    return (; β, P_lapse, choices)
+end
+
 function probability_choices(Lₜ, dots, σ, β)
     evidence = vec(sum(Lₜ[1:dots, :]; dims=1))
     samples = rand(MvNormal(evidence, dots*σ), 10_000)
@@ -31,7 +54,18 @@ end
 
 solution_to_params(sol) = (β = sol[1], σ_inf = sol[2])
 
-function fit_model(df, alg; kwargs...)
+function fit_bayes(df; kwargs...)
+    L = get_loglikelihood_dots(df)
+    C = get_choices(df)
+    RD = get_response_dots(df)
+
+    model = discrete_evidence(RD, L, C)
+    chain = sample(model, NUTS(), 2_000, progress=false)
+
+    return chain
+end
+
+function fit_discrete(df, alg; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choicesp1(df)
     RD = get_response_dots(df)
