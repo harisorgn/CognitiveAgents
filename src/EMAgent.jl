@@ -311,7 +311,7 @@ struct GridSearch
     step_size::Float64
 end
 
-function fit_model(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
     S = stimuli(df; grid_sz, σ_conv)
