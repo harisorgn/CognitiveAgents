@@ -32,7 +32,7 @@ end
 
 get_corrects(df) = map(x -> occursin("True", x) ? true : false, df.correct) 
 
-get_choices(df) = Int.(occursin.("right", df.response))
+get_choices(df) = occursin.("right", df.response)
 
 get_choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
 
