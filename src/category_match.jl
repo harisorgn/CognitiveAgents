@@ -1,4 +1,4 @@
-@model function discrete_evidence(response_dots, dot_evidence, choices)
+@model function category_match(response_dots, dot_evidence, choices)
     #σ ~ InverseGamma(2,8)
     β ~ LogNormal(4,1)
     P_lapse ~ Beta(1,20)
@@ -23,11 +23,17 @@
     #return (; β, choices)
 end
 
-function probability_choices(β, P_lapse, loglikelihoods, response_dots)
-    z_left, z_right = sum(loglikelihoods[1:response_dots, :]; dims=1)
-    P_left = logistic(β * (z_left - z_right))
+function probability_choices(Delta_loglikelihoods::Float64, β, P_lapse, )
+    P_left = logistic(β * Delta_loglikelihoods)
     
     return [P_left, 1 - P_left] .* (1 - P_lapse) .+ P_lapse / 2
+end
+
+function probability_choices(loglikelihoods::AbstractMatrix, response_dots, β, P_lapse)
+    z_left, z_right = sum(loglikelihoods[1:response_dots, :]; dims=1)
+    Delta_loglikelihoods = z_left - z_right
+    
+    return probability_choices(Delta_loglikelihoods, β, P_lapse)
 end
 
 function objective(p, dot_evidence, choices, response_dots)
@@ -43,7 +49,7 @@ function objective(p, dot_evidence, choices, response_dots)
 
         #β = pi / (σ * sqrt(6*(RD - 1)))
         
-        P_choices = probability_choices(β, P_lapse, loglikelihoods, RD)
+        P_choices = probability_choices(loglikelihoods, RD, β, P_lapse)
         choice_idx = choices[t] + 1
         P_choice = P_choices[choice_idx] 
        
@@ -60,7 +66,7 @@ struct CMResult
     run
 end
 
-function fit_bayes(df; kwargs...)
+function fit_CM_bayes(df; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
@@ -71,7 +77,7 @@ function fit_bayes(df; kwargs...)
     return chain
 end
 
-function fit_discrete_evidence(df, alg; kwargs...)
+function fit_CM_optimization(df, alg; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
