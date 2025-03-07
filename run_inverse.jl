@@ -1,24 +1,7 @@
 using CognitiveAgents
 using Serialization
 using Turing
-
-function fit_batch(IDs, session, run, algs, grid_sz, σ_conv; kwargs...)
-    for ID in IDs
-        df_fit = df[(df.subject_id .== ID) .& (df.run .== run) .& (df.session .== session), :]
-    
-        filename = "CL_res_subj-$(ID)_ses-$(session)_run-$(run)"
-        
-        alg = algs[1]
-        res = fit_model(df_fit, alg; grid_sz, σ_conv, kwargs...)
-
-        for alg in algs[2:end]
-            p0 = res.sol.u
-            res = fit_model(df_fit, alg, p0; grid_sz, σ_conv, kwargs...)
-        end
-
-        serialize(string("./results/", filename, ".jls"), res)
-    end  
-end
+using OptimizationNLopt
 
 cols = [
     :subject_id,
@@ -50,7 +33,7 @@ session = "glc"
 run = 1
 
 #df_fit = df[(df.subject_id .== 9) .& (df.run .== run) .& (df.session .== session), :]
-df_fit = df[(df.subject_id .== 9), :]
+df_fit = df[(df.subject_id .== 1) .& (df.run .== 1), :]
 
 using CognitiveAgents: get_loglikelihood_dots, get_choices, get_response_dots, discrete_evidence
 
@@ -60,12 +43,18 @@ RD = get_response_dots(df_fit)
 
 model = discrete_evidence(RD, L, C)
 sig, P_lapse, choices = model()
+#sig, choices = model()
 
 model = discrete_evidence(RD, L, choices)
-chain = sample(model, Emcee(40), 2_000, progress=false)
+chain = sample(model, NUTS(), 8_000, progress=false)
 chain_prior = sample(model, Prior(), 2_000, progress=false)
 
-res = fit_bayes(df_fit)
+alg = NLopt.LD_LBFGS()
+res = fit_discrete_evidence(df_fit, alg)
+
+
+
+
 
 #alg = NLopt.GN_CRS2_LM()
 for ID in IDs
