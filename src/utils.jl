@@ -78,7 +78,8 @@ function get_loglikelihood_dots(df::DataFrame)
         cat = parse(Int, r.category)
         ID = parse(Int, r.stimulus_ID)
         pack = parse(Int, last(split(r.version, '_')))
-        load_loglikelihood(pack, set, cat, ID)  
+        llhoods = load_loglikelihood(pack, set, cat, ID)  
+        #llhoods ./ abs.(minimum(llhoods; dims=1))
     end
 end
 
