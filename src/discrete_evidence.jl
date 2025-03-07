@@ -1,7 +1,7 @@
 @model function discrete_evidence(response_dots, dot_evidence, choices)
     #σ ~ InverseGamma(2,8)
-    β ~ Uniform(0, 100)
-    P_lapse ~ Beta(1, 5)
+    β ~ LogNormal(4,1)
+    P_lapse ~ Beta(1,20)
 
     N_trials = length(response_dots)
     for t in Base.OneTo(N_trials)
@@ -12,34 +12,42 @@
         #β = pi / (σ * sqrt(6*(RD - 1)))
         P_left = logistic(β * (z_left - z_right))
         P_choices = [P_left, 1 - P_left]
-      
+        
         choice_idx = choices[t] + 1
         P_choice = P_choices[choice_idx] * (1 - P_lapse) + P_lapse / 2
+        #P_choice = P_choices[choice_idx]
         choices[t] ~ Bernoulli(P_choice)
     end
 
     return (; β, P_lapse, choices)
+    #return (; β, choices)
 end
 
-function probability_choices(Lₜ, dots, σ, β)
-    evidence = vec(sum(Lₜ[1:dots, :]; dims=1))
-    samples = rand(MvNormal(evidence, dots*σ), 10_000)
-    P = softmax(β*samples)
-
-    return mean(P; dims=2)
+function probability_choices(β, P_lapse, loglikelihoods, response_dots)
+    z_left, z_right = sum(loglikelihoods[1:response_dots, :]; dims=1)
+    P_left = logistic(β * (z_left - z_right))
+    
+    return [P_left, 1 - P_left] .* (1 - P_lapse) .+ P_lapse / 2
 end
 
-function objective(p, L, choices, RD)
-    β, σ_inf = p
+function objective(p, dot_evidence, choices, response_dots)
+    β, P_lapse = p
 
-    N_trials = length(L)
+    N_trials = length(dot_evidence)
 
     loglikelihood = 0.0
 
     for t in Base.OneTo(N_trials)
-        Lₜ = @views L[t]
-        P = probability_choices(Lₜ, RD[t], σ_inf, β)
-        loglikelihood += log(P[choices[t]])
+        loglikelihoods = dot_evidence[t]
+        RD = response_dots[t]
+
+        #β = pi / (σ * sqrt(6*(RD - 1)))
+        
+        P_choices = probability_choices(β, P_lapse, loglikelihoods, RD)
+        choice_idx = choices[t] + 1
+        P_choice = P_choices[choice_idx] 
+       
+        loglikelihood += log(P_choice)
     end
 
     return -loglikelihood
@@ -52,8 +60,6 @@ struct CMResult
     run
 end
 
-solution_to_params(sol) = (β = sol[1], σ_inf = sol[2])
-
 function fit_bayes(df; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
@@ -65,19 +71,20 @@ function fit_bayes(df; kwargs...)
     return chain
 end
 
-function fit_discrete(df, alg; kwargs...)
+function fit_discrete_evidence(df, alg; kwargs...)
     L = get_loglikelihood_dots(df)
-    C = get_choicesp1(df)
+    C = get_choices(df)
     RD = get_response_dots(df)
 
     obj = OptimizationFunction(
-        (p, hyperp) -> objective(p, L, C, RD)
+        (p, hyperp) -> objective(p, L, C, RD),
+        Optimization.AutoForwardDiff()
     )
-    p0 = [1.0, 0.5]
-    prob = OptimizationProblem(obj, p0, lb = [0.0, 0.0], ub = [100.0, 100.0])
+    p0 = [2.0, 0.05]
+    prob = OptimizationProblem(obj, p0, lb = [0.0, 0.0], ub = [100.0, 1.0])
     sol = solve(prob, alg; kwargs...)
 
-    return CMResult(sol, only(unique(df.subject_id)), only(unique(df.session)), only(unique(df.run)))
+    return CMResult(sol, unique(df.subject_id), unique(df.session), unique(df.run))
 end
 
 function results_to_regressors(res::CMResult, df; inter_dot_interval = 0.55)
