@@ -725,3 +725,35 @@ function figure_faces_model(df; save_plot=false)
 
     f
 end
+
+function figure_CM_psychometric(df)
+    L = get_loglikelihood_dots(df)
+    C = get_choices(df)
+    RD = get_response_dots(df)
+
+    Delta_llhood = map(enumerate(L)) do (t, loglikelihoods)
+        sum(loglikelihoods[1:RD[t], 2]) - sum(loglikelihoods[1:RD[t], 1])
+    end
+
+    edges = range(minimum(Delta_llhood), maximum(Delta_llhood); length=11)
+    
+    P_right_choices = map(eachindex(edges[1:end-1])) do i
+        idx = findall(Delta_llhood) do Dl
+            (Dl >= edges[i]) && (Dl < edges[i+1])
+        end
+
+        sum(C[idx]) / length(C[idx])
+    end
+
+    f = Figure(;size = (1280, 720), fontsize=26)
+    ax = Axis(f[1,1])
+
+    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue)
+    
+    P = map(enumerate(L)) do (t, loglikelihoods)
+        probability_choices(1, 0.05, loglikelihoods, RD[t])[C[t]]
+    end
+    lines!(ax, Dl, logistic.(1*Dl); color=:orange)
+
+    f
+end
