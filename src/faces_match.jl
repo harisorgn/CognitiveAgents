@@ -13,6 +13,13 @@
 
 end
 
+function objective(p, data)
+    α, τ, z, drift_intercept, drift_slope = p
+    drifts = drift_intercept .+ drift_slope .* conditions
+
+    return -sum(logpdf.(DDM.(drifts, α, τ, z), data))
+end
+
 function add_data!(df, df_aggressive)
     N_faces = nrow(df_aggressive)
 
@@ -28,7 +35,7 @@ struct FacesResult
     run
 end
 
-function fit_model(df, filename; min_rt = 0.2)
+function fit_faces(df, filename; min_rt = 0.2)
     
     add_data!(df, df_aggressive)
 
