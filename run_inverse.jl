@@ -1,7 +1,7 @@
 using CognitiveAgents
 using Serialization
 using Turing
-using OptimizationNLopt
+using OptimizationOptimJL
 
 cols = [
     :subject_id,
@@ -32,8 +32,7 @@ IDs = [9, 36, 38, 40, 41, 43]
 session = "glc"
 run = 1
 
-#df_fit = df[(df.subject_id .== 9) .& (df.run .== run) .& (df.session .== session), :]
-df_fit = df[(df.subject_id .== 1) .& (df.run .== 1), :]
+df_fit = df[(df.subject_id .== 36) .& (df.run .== 1), :]
 
 using CognitiveAgents: get_loglikelihood_dots, get_choices, get_response_dots, discrete_evidence
 
@@ -41,16 +40,18 @@ L = get_loglikelihood_dots(df_fit)
 C = get_choices(df_fit)
 RD = get_response_dots(df_fit)
 
-model = discrete_evidence(RD, L, C)
-sig, P_lapse, choices = model()
+#model = category_match(RD, L, C)
+#sig, P_lapse, choices = model()
 #sig, choices = model()
 
 model = discrete_evidence(RD, L, choices)
 chain = sample(model, NUTS(), 8_000, progress=false)
 chain_prior = sample(model, Prior(), 2_000, progress=false)
 
-alg = NLopt.LD_LBFGS()
-res = fit_discrete_evidence(df_fit, alg)
+chain = fit_CM_bayes(df_fit)
+
+alg = Optim.IPNewton()
+res = fit_CM_optimization(df_fit, alg)
 
 
 
