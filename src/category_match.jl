@@ -23,7 +23,7 @@
     #return (; β, choices)
 end
 
-function probability_choices(Delta_loglikelihoods::Float64, β, P_lapse, )
+function probability_choices(Delta_loglikelihoods::Float64, β, P_lapse)
     P_left = logistic(β * Delta_loglikelihoods)
     
     return [P_left, 1 - P_left] .* (1 - P_lapse) .+ P_lapse / 2
@@ -71,7 +71,7 @@ function fit_CM_bayes(df; kwargs...)
     C = get_choices(df)
     RD = get_response_dots(df)
 
-    model = discrete_evidence(RD, L, C)
+    model = category_match(RD, L, C)
     chain = sample(model, NUTS(), 2_000, progress=false)
 
     return chain
