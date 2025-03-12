@@ -90,6 +90,8 @@ function get_response_dots(df::DataFrame; inter_dot_interval = 0.55)
     return Int.(dots)
 end
 
+get_image_IDs(df::DataFrame) = parse.(Int, df.image_response)
+
 load_image(pack, set, category, ID) = load("./stimuli/$(pack)/set_$(set)/cat_$(category)/ex_$(category)_$(ID).png")
 
 function load_loglikelihood(pack, set, category, ID)
