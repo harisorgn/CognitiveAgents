@@ -96,6 +96,13 @@ function read_data_bipolar(files, cols; include_omissions=false)
     return df
 end
 
+function read_aggressiveness(df::DataFrame)
+    image_IDs = get_image_IDs(df)
+    df_agr = CSV.read("./data/aggressiveness.csv", DataFrame)
+
+    return df_agr[image_IDs, :]
+end
+
 function subject_bonus(df)
     for ID in unique(df[!, :subject_id])
         println("$(ID) => $(maximum(df[df.subject_id .== ID, :bonus]))")
