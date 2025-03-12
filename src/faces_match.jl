@@ -13,9 +13,9 @@
 
 end
 
-function objective(p, data)
+function objective(p, data, aggressiveness)
     α, τ, z, drift_intercept, drift_slope = p
-    drifts = drift_intercept .+ drift_slope .* conditions
+    drifts = drift_intercept .+ (drift_slope .* aggressiveness)
 
     return -sum(logpdf.(DDM.(drifts, α, τ, z), data))
 end
@@ -23,41 +23,42 @@ end
 function add_data!(df, df_aggressive)
     N_faces = nrow(df_aggressive)
 
-    df.choice = choicesp1(df)
+    df.choice = get_choicesp1(df)
     df.rt = get_response_times(df)
     df.score = repeat(df_aggressive.score, Int(nrow(df) / N_faces))
 end
 
 struct FacesResult
-    chain
+    sol
     subject_ID
     session
     run
 end
 
-function fit_faces(df, filename; min_rt = 0.2)
-    
-    add_data!(df, df_aggressive)
+function fit_faces(df, alg; min_rt = 0.2, kwargs...)
+    df_agr = read_aggressiveness(df)
+    df_agr.score .-= 5.5
+    add_data!(df, df_agr)
 
     filter!(:rt => rt -> !ismissing(rt) && rt >= min_rt, df)
 
     data = map(eachrow(df)) do r
         (choice = r.choice, rt = r.rt)
     end
-    @assert all(map(d -> d.choice==1 || d.choice == 2, data))
-    N_conditions = length(unique(df.score))
 
-    md = ddm(data, df.score, N_conditions; min_rt)
+    obj = OptimizationFunction(
+        (p, hyperp) -> objective(p, data, df.score),
+        Optimization.AutoForwardDiff()
+    )
+    p0 = [1.0, 0.1, 0.5, 0.0, 1]
+    prob = OptimizationProblem(obj, p0, lb = [0.5, 0.0, 0.0, -Inf, -Inf], ub = [2, 0.5, 1.0, Inf, Inf])
+    sol = solve(prob, alg; kwargs...)
 
-    chain = sample(md, NUTS(), 2000)
+    id = unique(df.subject_id)
+    session = unique(df.session)
+    run = unique(df.run)
 
-    id = only(unique(df.subject_id))
-    session = only(unique(df.session))
-    run = only(unique(df.run))
-
-    res = FacesResult(chain, id, session, run)
-
-    serialize(string("./results/", filename, ".jls"), res)
+    res = FacesResult(sol, id, session, run)
 
     return res
 end
@@ -116,4 +117,24 @@ function results_to_dataframe(results)
     sort!(df, :subject_ID)
 
     return df
+end
+
+function results_to_regressors(res::FacesResult, df)
+    df_regress = DataFrame(t = Float64[], P_chosen = Float64[], P_unchosen = Float64[], P_left = Float64[], P_right = Float64[])
+
+    aggressiveness = df.score
+
+    RT = get_response_times(df)
+
+    α, τ, z, drift_intercept, drift_slope = res.sol
+    drifts = drift_intercept .+ drift_slope .* aggressiveness
+
+    for t in eachindex(RT)
+        push!(
+            df_regress, 
+            (t = t_dot, P_chosen = P[C[t]], P_unchosen = P[idx_unchosen], P_left = P[1], P_right = P[2])
+        )
+    end
+
+    CSV.write("CM_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
 end
