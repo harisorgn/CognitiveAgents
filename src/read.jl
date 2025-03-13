@@ -65,15 +65,16 @@ function read_data_bipolar(files, cols; include_omissions=false)
 
         df_subj = CSV.read(f, DataFrame, types=String)
 
+        df_subj.trial_index = Base.OneTo(nrow(df_subj))
         df_subj.subject_id .= subject_ID
         df_subj.session .= session
         df_subj.run .= parse(Int, run)
 
         if "pack" in names(df_subj)
-            extra_cols = [:run, :session, :pack]
+            extra_cols = [:trial_index, :run, :session, :pack]
             df_subj.pack .= df_subj.version
         else
-            extra_cols = [:run, :session]
+            extra_cols = [:trial_index, :run, :session]
         end
 
         df_subj.response[ismissing.(df_subj.response)] .= ""
@@ -82,7 +83,7 @@ function read_data_bipolar(files, cols; include_omissions=false)
         if "bonus" in names(df_subj)
             df_subj.bonus[ismissing.(df_subj.bonus)] .= "0.0"
         end
-        
+
         if (omissions(df_subj) / nrow(df_subj) <= 0.1)
             if include_omissions
                 append!(df, df_subj[:, vcat(cols, extra_cols)])
