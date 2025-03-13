@@ -97,11 +97,14 @@ function read_data_bipolar(files, cols; include_omissions=false)
     return df
 end
 
-function read_aggressiveness(df::DataFrame)
-    image_IDs = get_image_IDs(df)
+function read_aggressiveness(df::DataFrame; normalize=true)
     df_agr = CSV.read("./data/aggressiveness.csv", DataFrame)
 
-    return df_agr[image_IDs, :]
+    if normalize
+        return df_agr[df.trial_index, [:score]] .- mean(df_agr.score)
+    else
+        return df_agr[df.trial_index, [:score]]
+    end
 end
 
 function subject_bonus(df)
