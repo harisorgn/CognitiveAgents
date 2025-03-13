@@ -7,9 +7,9 @@
     drift_intercept ~ Normal(0, 1)
     drift_slope ~ Normal(0, 1)
 
-    drifts = drift_intercept .+ drift_slope .* conditions
+    drift = drift_intercept .+ drift_slope .* conditions
 
-    Turing.@addlogprob! sum(logpdf.(DDM.(drifts, α, τ, z), data))
+    Turing.@addlogprob! sum(logpdf.(DDM.(drift, α, z, τ), data))
 
 end
 
@@ -17,15 +17,13 @@ function objective(p, data, aggressiveness)
     α, τ, z, drift_intercept, drift_slope = p
     drifts = drift_intercept .+ (drift_slope .* aggressiveness)
 
-    return -sum(logpdf.(DDM.(drifts, α, τ, z), data))
+    return -sum(logpdf.(DDM.(drifts, α, z, τ), data))
 end
 
 function add_data!(df, df_aggressive)
-    N_faces = nrow(df_aggressive)
-
     df.choice = get_choicesp1(df)
     df.rt = get_response_times(df)
-    df.score = repeat(df_aggressive.score, Int(nrow(df) / N_faces))
+    df.score = df_aggressive.score
 end
 
 struct FacesResult
@@ -36,8 +34,7 @@ struct FacesResult
 end
 
 function fit_faces(df, alg; min_rt = 0.2, kwargs...)
-    df_agr = read_aggressiveness(df)
-    df_agr.score .-= 5.5
+    df_agr = read_aggressiveness(df; normalize=true)
     add_data!(df, df_agr)
 
     filter!(:rt => rt -> !ismissing(rt) && rt >= min_rt, df)
@@ -50,8 +47,8 @@ function fit_faces(df, alg; min_rt = 0.2, kwargs...)
         (p, hyperp) -> objective(p, data, df.score),
         Optimization.AutoForwardDiff()
     )
-    p0 = [1.0, 0.1, 0.5, 0.0, 1]
-    prob = OptimizationProblem(obj, p0, lb = [0.5, 0.0, 0.0, -Inf, -Inf], ub = [2, 0.5, 1.0, Inf, Inf])
+    p0 = [1.0, 0.1, 0.5, 0.0, 1.0]
+    prob = OptimizationProblem(obj, p0, lb = [0.5, 0.0, 0.0, -Inf, -Inf], ub = [Inf, Inf, 1.0, Inf, Inf])
     sol = solve(prob, alg; kwargs...)
 
     id = unique(df.subject_id)
