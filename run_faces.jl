@@ -25,3 +25,4 @@ df_fit = df[(df.subject_id .== 9) .& (df.run .== 1), :]
 alg = Optim.IPNewton()
 res = fit_faces(df_fit, alg)
 
+figure_faces_psychophysics_model(df_fit, res)
