@@ -407,30 +407,57 @@ function figure_RT_aggressiveness(df, aggressiveness, session; save_plot=false)
     f
 end
 
-function plot_acc_aggressiveness!(ax, df, aggressiveness; color=:black, kwargs...)
-    c = get_corrects(df)
-    score = sort(unique(aggressiveness))
-    N_faces = length(aggressiveness)
-    N_runs = length(c) ÷ N_faces 
+function plot_faces_psychophysics!(ax, df::DataFrame; color=:black, kwargs...)
+    choices = get_choicesp1(df)
+    aggressiveness = df.score
+    scores = sort(unique(aggressiveness))
 
-    μ_acc_score = map(score) do s
-        idx = repeat(aggressiveness .== s, N_runs)
-        mean(c[idx])
+    μ_acc_score = map(scores) do s
+        idx = aggressiveness .== s
+        N_trials_score = sum(idx)
+        sum(choices[idx] .== 2) / N_trials_score
     end
 
-    sem_acc_score = map(score) do s
-        idx = repeat(aggressiveness .== s, N_runs)
-        std(c[idx]) / sqrt(length(c[idx]))
+    sem_acc_score = map(scores) do s
+        idx = aggressiveness .== s
+        N_trials_score = sum(idx)
+        std(choices[idx] .== 2) / sqrt(N_trials_score)
     end
 
-    lines!(ax, score, μ_acc_score; color, kwargs...)
-    scatter!(ax, score, μ_acc_score; color)
-    errorbars!(ax, score, μ_acc_score, sem_acc_score; color)
+    lines!(ax, scores, μ_acc_score; color, kwargs...)
+    scatter!(ax, scores, μ_acc_score; color)
+    errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function figure_acc_aggressiveness(df, aggressiveness, session; save_plot=false)
+function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, kwargs...)
+    α, τ, z, drift_intercept, drift_slope = res.sol
+    N_samples = 10_000
+
+    μ_acc_score = map(scores) do s
+        drift = drift_intercept + (drift_slope * s)
+        model = DDM(drift, α, z, τ)
+        choices = rand(model, N_samples).choice
+        sum(choices .== 2) / N_samples
+    end
+
+    sem_acc_score = map(scores) do s
+        drift = drift_intercept + (drift_slope * s)
+        model = DDM(drift, α, z, τ)
+        choices = rand(model, N_samples).choice
+        std(choices .== 2) / sqrt(N_samples)
+    end
+
+    lines!(ax, scores, μ_acc_score; color, kwargs...)
+    scatter!(ax, scores, μ_acc_score; color)
+    errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
+end
+
+function figure_acc_aggressiveness(df, session; save_plot=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
+    df_agr = read_aggressiveness(df)
+    add_data!(df, df_agr)
+
     f = Figure(;size = (1024, 768), fontsize=30)
     ax = Axis(
         f[1, 1], 
@@ -469,6 +496,43 @@ function figure_acc_aggressiveness(df, aggressiveness, session; save_plot=false)
 
     if save_plot
         save(string("task3_acc_aggress_$(session)", ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
+function figure_faces_psychophysics_model(df, res; save_plot=false)
+    colormap = ColorSchemes.seaborn_bright.colors
+    
+    df_agr = read_aggressiveness(df)
+    add_data!(df, df_agr)
+
+    f = Figure(;size = (1024, 768), fontsize=30)
+    ax = Axis(
+        f[1, 1], 
+        title = "",
+        xlabel = "Aggressiveness",
+        xticks = 0:10,
+        yticks = 0:0.2:1,
+        ylabel = "Probability of friend response"
+    )
+
+    plot_faces_psychophysics!(ax, df; color=colormap[1], label = "Data")
+
+    scores = sort(unique(df.score))
+    plot_faces_psychophysics!(ax, res, scores; color=colormap[2], label = "Model")
+    #image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./figures/angry.png")))
+ 
+    #image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./figures/ambiguous.png")))
+
+    #image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./figures/neutral.png")))
+
+    ylims!.(ax, -0.3, 1.0)
+
+    f[1, 2] = Legend(f, ax, framevisible = false)
+
+    if save_plot
+        save(string("faces_acc_aggress_model.png"), f, pt_per_unit=1)
     end
 
     f
@@ -726,7 +790,7 @@ function figure_faces_model(df; save_plot=false)
     f
 end
 
-function figure_CM_psychometric(df, β, P_lapse)
+function figure_CM_psychophysics(df, β, P_lapse)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
