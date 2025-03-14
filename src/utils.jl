@@ -38,6 +38,8 @@ get_choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
 
 get_correct_categories(df::DataFrame) = Int.(occursin.("right", df.correct_response))
 
+get_corrects(df::DataFrame) = return eltype(df.correct) <: Bool ? df.correct : parse.(Bool, df.correct)
+
 function get_response_times(df)
     RT = df.response_time
     r = Vector{Union{Float64, Missing}}(undef, length(RT))
