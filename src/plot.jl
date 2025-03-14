@@ -76,7 +76,7 @@ function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_tria
     f[1, 2] = Legend(f, ax, framevisible = false, unique = true)
 
     if save
-        save(string("CL_subject_acc_", name, ".png"), f, pt_per_unit=1)
+        save(string("CL_subject_acc.png"), f, pt_per_unit=1)
     end
 
     f
