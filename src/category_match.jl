@@ -66,7 +66,7 @@ struct CMResult
     run
 end
 
-function fit_CM_bayes(df; kwargs...)
+function fit_CM(df; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
@@ -77,7 +77,7 @@ function fit_CM_bayes(df; kwargs...)
     return chain
 end
 
-function fit_CM_optimization(df, alg; kwargs...)
+function fit_CM(df, alg; kwargs...)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
