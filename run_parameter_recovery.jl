@@ -47,22 +47,3 @@ choices = run_task!(agent, env)
 
 alg = GridSearch(0.01)
 res = fit_model(S, choices, corrects, alg; grid_sz, σ_conv)
-
-
-# Task 2
-
-using CognitiveAgents: get_loglikelihood_dots, get_choices, get_response_dots, discrete_evidence
-
-L = get_loglikelihood_dots(df_fit)
-C = get_choices(df_fit)
-RD = get_response_dots(df_fit)
-
-#model = category_match(RD, L, C)
-#sig, P_lapse, choices = model()
-#sig, choices = model()
-
-model = discrete_evidence(RD, L, choices)
-chain = sample(model, NUTS(), 8_000, progress=false)
-chain_prior = sample(model, Prior(), 2_000, progress=false)
-
-chain = fit_CM_bayes(df_fit)
