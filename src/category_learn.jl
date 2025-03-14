@@ -108,7 +108,7 @@ function E_step!(agent::EMAgent, stim, correct_category, t)
         loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
         agent.loglhood_stim[k] = loglhood_stim
 
-        P = probability_cat1(stim, W[:,k])
+        P = probability_right_category(stim, W[:,k])
         loglhood_category[k] = loglikelihood_category(P, correct_category) 
 
         agent.logq[k] = loglhood_stim + loglhood_category[k]
@@ -158,7 +158,7 @@ function E_step_category!(agent::EMAgent, stim, correct_category, t)
         loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
         agent.loglhood_stim[k] = loglhood_stim
 
-        P = probability_cat1(stim, W[:,k])
+        P = probability_right_category(stim, W[:,k])
         loglhood_category[k] = loglikelihood_category(P, correct_category) 
 
         agent.logq[k] = loglhood_stim + loglhood_category[k]
@@ -178,7 +178,7 @@ end
 
 function M_step!(agent::EMAgent, stim, correct_cat)
     for k in eachindex(agent.logq)
-        predicted_cat = probability_cat1(stim, agent.W[:,k])
+        predicted_cat = probability_right_category(stim, agent.W[:,k])
         agent.W[:,k] .+= stim .* prediction_error(correct_cat, predicted_cat, agent.η, agent.logq[k])
     end
 end
@@ -198,10 +198,12 @@ function loglikelihood_stimulus(stim, S̄, N; σ²=1)
     return loglhood
 end
 
-probability_cat1(stim, w) = logistic(w' * stim)
+probability_right_category(stim, w) = logistic(w' * stim)
 
-function loglikelihood_category(P_cat1, cat)
-    return cat * log(P_cat1 + eps()) + (1 - cat) * log(1 - P_cat1 + eps())
+probability_right_category(stim, w, β) = logistic(β * w' * stim)
+
+function loglikelihood_category(P_right_cat, cat)
+    return cat * log(P_right_cat + eps()) + (1 - cat) * log(1 - P_right_cat + eps())
 end
 
 function logprior(k, z, t; β=1)
@@ -216,7 +218,7 @@ function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
     K = length(logq)
 
     loglhood_category = map(Base.OneTo(K)) do k    
-        P = probability_cat1(stim, W[:,k])
+        P = probability_right_category(stim, W[:,k])
         loglikelihood_category(P, choice_cat) 
     end
     
@@ -252,7 +254,7 @@ end
 
 function act(agent::EMAgent, stimulus)
     z_stim_t = argmax(agent.logq_stim)
-    P = probability_cat1(stimulus, agent.W[:, z_stim_t])
+    P = probability_right_category(stimulus, agent.W[:, z_stim_t])
     choice = Int(rand(Bernoulli(P)))
 
     return choice
@@ -292,12 +294,6 @@ end
 
 initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=1, β=1, σ²=2)
 
-function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
-    agent = initialise_agent(S, p) 
-    
-    return -loglikelihood(agent, S, choices, corrects)
-end
-
 struct CLResult
     sol
     image_size
@@ -319,12 +315,38 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     return fit_model(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
 end
 
-function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, alg; σ_conv=5, grid_sz=(50,50), id=0, session="paramete_recovery", run=0, kwargs...)
-    obj = OptimizationFunction((p, hyperp) -> objective(S, choices, corrects, p))
+function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
+    #agent = initialise_agent(S, p) 
+    #return -loglikelihood(agent, S, choices, corrects)
 
-    p0 = [0.1, 0.1]
-    lb = [1e-5, 1e-5]
-    ub = [1.0, 1.0]
+    η, β = p
+
+    D, N_trials = size(S)
+    weights = zeros(typeof(η), D)
+    llhood = 0.0
+
+    for t in Base.OneTo(N_trials)
+        stimulus = S[:,t]
+        choice_cat = choices[t]
+        correct_cat = corrects[t]
+
+        P_right = probability_right_category(stimulus, weights, β)
+
+        llhood += loglikelihood_category(P_right, choice_cat)
+
+        weights .+= η * (correct_cat - P_right) .* stimulus 
+    end
+
+    return -llhood
+end
+
+function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+    choices = get_choices(df)
+    corrects = get_correct_categories(df)
+    S = get_stimuli(df; grid_sz, σ_conv)
+
+    lb = [0, 0]
+    ub = [1.0, Inf]
     
     if alg isa GridSearch
         step_sz = alg.step_size
@@ -339,12 +361,50 @@ function fit_model(S::AbstractMatrix, choices::AbstractVector, corrects::Abstrac
 
         sol = OBJ
     else
+        obj = OptimizationFunction(
+            (p, hyperp) -> objective(S, choices, corrects, p), 
+            Optimization.AutoForwardDiff()
+        )
+        p0 = [0.1, 1]
         prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
         sol = solve(prob, alg; kwargs...)
     end
+
+    id = unique(df.subject_id)
+    session = unique(df.session)
+    run = unique(df.run)
+
     res = CLResult(sol, grid_sz, σ_conv, id, session, run)
 
     return res
+end
+
+function run_CL_task(df::DataFrame, res::CLResult)
+    corrects = get_correct_categories(df)
+    S = get_stimuli(df; grid_sz = res.image_size, σ_conv = res.σ_convolution)
+    η, β = res.sol
+
+    D, N_trials = size(S)
+    weights = zeros(typeof(η), D)
+
+    choices = zeros(N_trials)
+    iscorrects = zeros(Bool, N_trials)
+    for t in Base.OneTo(N_trials)
+        stimulus = S[:,t]
+        correct_cat = corrects[t]
+
+        P_right = probability_right_category(stimulus, weights, β)
+        choices[t] = rand(Bernoulli(P_right))
+        iscorrects[t] = correct_cat == choices[t]
+
+        weights .+= η * (correct_cat - P_right) .* stimulus 
+    end
+
+    df_sim = copy(df)
+    df_sim.response .= choices
+    df_sim.correct .= iscorrects
+
+    return df_sim
 end
 
 function results_to_regressors(res::CLResult, df)
@@ -377,7 +437,7 @@ function results_to_regressors(res::CLResult, df)
         z = ag.z[t]
         w = t == 1 ? zeros(D) : tm.W[t-1][:, z]
         logq = tm.logq[t][z]
-        pred_cat = probability_cat1(X[:, t], w)
+        pred_cat = probability_right_category(X[:, t], w)
         RPE = prediction_error(C[t], pred_cat, ag.η, logq)
 
         if RPE > 0.0
