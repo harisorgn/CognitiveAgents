@@ -1,4 +1,4 @@
-function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)); name="", save_plot=false, title="")
+function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)); name="", save=false, title="")
     IDs = unique(df[!, :subject_id])    
     sets = unique(df[!, :set])
 
@@ -32,7 +32,7 @@ function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=In
     vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
 
-    if save_plot
+    if save
         save(string("subject_acc_", name, ".png"), f, pt_per_unit=1)
     end
 
@@ -69,7 +69,7 @@ function group_accuracy_per_set!(ax, df, N_trials_per_set)
     end
 end
 
-function plot_group_accuracy_per_set(df, N_trials_per_set; name="", save_plot=false, title="", N_training=0)
+function plot_group_accuracy_per_set(df, N_trials_per_set; name="", save=false, title="", N_training=0)
     
     f = Figure(;size = (1024, 768), fontsize=30)
     ax = Axis(
@@ -83,7 +83,7 @@ function plot_group_accuracy_per_set(df, N_trials_per_set; name="", save_plot=fa
 
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
 
-    if save_plot
+    if save
         save(string("group_acc_per_set_", name, ".png"), f, pt_per_unit=1)
     end
 
@@ -126,7 +126,7 @@ function group_accuracy!(ax, df, N_trials_per_set; color=:black, kwargs...)
 
 end
 
-function plot_group_accuracy(df, N_trials_per_set=20; name="", label="", save_plot=false)
+function plot_group_accuracy(df, N_trials_per_set=20; name="", label="", save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -145,14 +145,14 @@ function plot_group_accuracy(df, N_trials_per_set=20; name="", label="", save_pl
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save(string("group_acc_", name, ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_group_accuracy(df, N_trials_per_set, session; save_plot=false)
+function figure_group_accuracy(df, N_trials_per_set, session; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -185,7 +185,7 @@ function figure_group_accuracy(df, N_trials_per_set, session; save_plot=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save(string("task1_new_acc_$(session)", ".png"), f, pt_per_unit=1)
     end
 
@@ -199,7 +199,7 @@ function plot_RT!(ax, df; color=:black)
     vlines!(ax, median(RT); linestyle = :dash, linewidth = 2, color)
 end
 
-function plot_rt(df; name="", save_plot=false, title="", N_training=0)
+function plot_rt(df; name="", save=false, title="", N_training=0)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -212,14 +212,14 @@ function plot_rt(df; name="", save_plot=false, title="", N_training=0)
 
     plot_RT!(ax, df; color=colormap[1])
 
-    if save_plot
+    if save
         save(string("RT_", name, ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function plot_model_params(res, labels; save_plot=false)
+function plot_model_params(res, labels; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
     N_subjects, N_conditions = size(res)
@@ -251,7 +251,7 @@ function plot_model_params(res, labels; save_plot=false)
         lines!(ax[2], 1:N_conditions, σ; color=(colormap[mod(i, length(colormap))+1], 0.8))
     end        
 
-    if save_plot
+    if save
         save(string(join(labels, "_VS_"), ".png"), f, pt_per_unit=1)
     end
 
@@ -259,7 +259,7 @@ function plot_model_params(res, labels; save_plot=false)
 end
 
 
-function plot_prob_choice(L, β, σ; save_plot=false)
+function plot_prob_choice(L, β, σ; save=false)
     N_dots, N_categories = size(L)
 
     P = zeros(N_dots, N_categories)
@@ -286,7 +286,7 @@ function plot_prob_choice(L, β, σ; save_plot=false)
 
     f[1, 2] = Legend(f, ax, "Choice", framevisible = false)
 
-    if save_plot
+    if save
         save("example_prob_choice.png", f, pt_per_unit=1)
     end
 
@@ -304,7 +304,7 @@ function plot_cumulative_RT!(ax, df, xs; color=:black, kwargs...)
     vlines!(ax, median(RT); linestyle = :dash, linewidth = 2, color)
 end
 
-function figure_cumulative_RT(df, session, xs; save_plot=false)
+function figure_cumulative_RT(df, session, xs; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -334,7 +334,7 @@ function figure_cumulative_RT(df, session, xs; save_plot=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save(string("task2_cRT_$(session)", ".png"), f, pt_per_unit=1)
     end
 
@@ -384,7 +384,7 @@ function plot_RT_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
     errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
 end
 
-function figure_faces_RT(df::DataFrame, session; save_plot=false)
+function figure_faces_RT(df::DataFrame, session; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -420,14 +420,14 @@ function figure_faces_RT(df::DataFrame, session; save_plot=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save("faces_RT_ses_$(session).png", f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_RT(df::DataFrame, res::FacesResult; save_plot=false)
+function figure_faces_RT(df::DataFrame, res::FacesResult; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -454,7 +454,7 @@ function figure_faces_RT(df::DataFrame, res::FacesResult; save_plot=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save("faces_RT_model.png", f, pt_per_unit=1)
     end
 
@@ -506,7 +506,7 @@ function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, k
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function figure_faces_psychophysics(df::DataFrame, session; save_plot=false)
+function figure_faces_psychophysics(df::DataFrame, session; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df; normalize=true)
@@ -548,14 +548,14 @@ function figure_faces_psychophysics(df::DataFrame, session; save_plot=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save(string("faces_psychophysics_ses_$(session)", ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save_plot=false)
+function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df)
@@ -585,7 +585,7 @@ function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save_plot=f
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save_plot
+    if save
         save("faces_psychophysics_model.png", f, pt_per_unit=1)
     end
 
@@ -607,7 +607,7 @@ function plot_param_diff!(ax, df, param, sessions; colormap = ColorSchemes.seabo
     end
 end
 
-function figure_CL_model(df; save_plot=false)
+function figure_CL_model(df; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     sessions = unique(df.session)
@@ -663,14 +663,14 @@ function figure_CL_model(df; save_plot=false)
     supertitle = f[0, :] = Label(f, "Model parameter changes compared to baseline",
         fontsize = 30, color = (:black, 0.6))
 
-    if save_plot
+    if save
         save(string("task1_model_params", ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_CM_model(df; save_plot=false)
+function figure_CM_model(df; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     sessions = unique(df.session)
@@ -717,7 +717,7 @@ function figure_CM_model(df; save_plot=false)
     supertitle = f[0, :] = Label(f, "Model parameter changes compared to baseline",
         fontsize = 30, color = (:black, 0.6))
 
-    if save_plot
+    if save
         save(string("task2_model_params", ".png"), f, pt_per_unit=1)
     end
 
@@ -747,7 +747,7 @@ function plot_posterior_param_diff!(ax, df, param, sessions; colormap = ColorSch
     end
 end
 
-function figure_faces_model(df; save_plot=false)
+function figure_faces_model(df; save=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     sessions = unique(df.session)
@@ -837,14 +837,14 @@ function figure_faces_model(df; save_plot=false)
     supertitle = f[0, :] = Label(f, "Model parameter changes compared to baseline",
         fontsize = 26, color = (:black, 0.6))
 
-    if save_plot
+    if save
         save(string("task3_model_params", ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_CM_psychophysics(df, β, P_lapse)
+function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save = false)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
@@ -859,7 +859,7 @@ function figure_CM_psychophysics(df, β, P_lapse)
 
     Delta_llhood = z_right .- z_left
 
-    edges = range(minimum(Delta_llhood), maximum(Delta_llhood); length=11)
+    edges = range(minimum(Delta_llhood), maximum(Delta_llhood); length=(N_points + 1))
     
     P_right_choices = map(eachindex(edges[1:end-1])) do i
         idx = findall(Delta_llhood) do Dl
@@ -870,15 +870,16 @@ function figure_CM_psychophysics(df, β, P_lapse)
     end
 
     f = Figure(;size = (1280, 720), fontsize=26)
-    ax = Axis(f[1,1])
+    ax = Axis(f[1,1], xlabel = "Likelihood difference", ylabel = "Probability of category 2")
 
-    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue)
+    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue, markersize = 10)
     
     r = range(minimum(Delta_llhood), maximum(Delta_llhood); length=1000)
     
+    β, P_lapse = res.sol
     P_right_model = last.(probability_choices.(-r, β, P_lapse))
 
-    lines!(ax, r, P_right_model; color=:orange)
+    lines!(ax, r, P_right_model; color=:orange, linewidth = 10)
 
     f
 end
