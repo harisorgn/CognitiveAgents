@@ -44,6 +44,6 @@ export get_choices, get_correct_categories, get_stimuli, get_response_times
 export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
 export objective, category_match, fit_CM_bayes, fit_CM_optimization, fit_faces, run_trial!, run_task!
 export plot_subject_accuracy, plot_group_accuracy, plot_group_accuracy_per_set, plot_rt
-export figure_CM_psychophysics, figure_faces_psychophysics_model
+export figure_CM_psychophysics, figure_faces_psychophysics, figure_faces_RT
 
 end 

@@ -341,28 +341,50 @@ function figure_cumulative_RT(df, session, xs; save_plot=false)
     f
 end
 
-function plot_RT_aggressiveness!(ax, df, aggressiveness; color=:black, kwargs...)
+function plot_RT_faces!(ax, df; color=:black, kwargs...)
     RT = get_response_times(df)
-    score = sort(unique(aggressiveness))
-    N_faces = length(aggressiveness)
-    N_runs = length(RT) ÷ N_faces 
+    aggressiveness = df.score
+    scores = sort(unique(aggressiveness))
 
-    μ_RT_score = map(score) do s
-        idx = repeat(aggressiveness .== s, N_runs)
+    μ_RT_score = map(scores) do s
+        idx = aggressiveness .== s
         mean(skipmissing(RT[idx]))
     end
 
-    sem_RT_score = map(score) do s
-        idx = repeat(aggressiveness .== s, N_runs)
+    sem_RT_score = map(scores) do s
+        idx = aggressiveness .== s
         std(skipmissing(RT[idx])) / sqrt(count(.!ismissing.(RT[idx])))
     end
 
-    lines!(ax, score, μ_RT_score; color, kwargs...)
-    scatter!(ax, score, μ_RT_score; color)
-    errorbars!(ax, score, μ_RT_score, sem_RT_score; color)
+    lines!(ax, scores, μ_RT_score; color, kwargs...)
+    scatter!(ax, scores, μ_RT_score; color)
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
 end
 
-function figure_RT_aggressiveness(df, aggressiveness, session; save_plot=false)
+function plot_RT_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
+    α, τ, z, drift_intercept, drift_slope = res.sol
+    N_samples = 10_000
+
+    μ_RT_score = map(scores) do s
+        drift = drift_intercept + (drift_slope * s)
+        model = DDM(drift, α, z, τ)
+        RT = rand(model, N_samples).rt
+        mean(RT)
+    end
+
+    sem_RT_score = map(scores) do s
+        drift = drift_intercept + (drift_slope * s)
+        model = DDM(drift, α, z, τ)
+        RT = rand(model, N_samples).rt
+        std(RT) / sqrt(N_samples)
+    end
+
+    lines!(ax, scores, μ_RT_score; color, kwargs...)
+    scatter!(ax, scores, μ_RT_score; color)
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
+end
+
+function figure_faces_RT(df::DataFrame, session; save_plot=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -374,18 +396,16 @@ function figure_RT_aggressiveness(df, aggressiveness, session; save_plot=false)
         ylabel = "Response Time [sec]"
     )
 
-    plot_RT_aggressiveness!(
+    plot_RT_faces!(
         ax, 
-        df[(df.session.==session) .& (df.run.==1),:], 
-        aggressiveness; 
+        df[(df.session.==session) .& (df.run.==1),:]; 
         color=colormap[1],
         label = "Control"
     )
 
-    plot_RT_aggressiveness!(
+    plot_RT_faces!(
         ax, 
-        df[(df.session.==session) .& (df.run.==2),:], 
-        aggressiveness; 
+        df[(df.session.==session) .& (df.run.==2),:]; 
         color=colormap[2],
         label = session.=="glc" ? "Glucose" : "BHB"
     )
@@ -396,12 +416,46 @@ function figure_RT_aggressiveness(df, aggressiveness, session; save_plot=false)
 
     image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./figures/neutral.png")))
 
-    ylims!.(ax, 0.6, 1.6)
+    #ylims!.(ax, 0.6, 1.6)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
     if save_plot
-        save(string("task3_RT_aggress_$(session)", ".png"), f, pt_per_unit=1)
+        save("faces_RT_ses_$(session).png", f, pt_per_unit=1)
+    end
+
+    f
+end
+
+function figure_faces_RT(df::DataFrame, res::FacesResult; save_plot=false)
+    colormap = ColorSchemes.seaborn_bright.colors
+    
+    f = Figure(;size = (1024, 768), fontsize=30)
+    ax = Axis(
+        f[1, 1], 
+        title = "",
+        xlabel = "Aggressiveness",
+        xticks = (-4.5:4.5, ["$(i)" for i in Base.OneTo(10)]),
+        ylabel = "Response Time [sec]"
+    )
+
+    plot_RT_faces!(ax, df; color=colormap[1], label = "Data")
+
+    scores = sort(unique(df.score))
+    plot_RT_faces!(ax, res, scores; color=colormap[2], label = "Model")
+ 
+    #image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./figures/angry.png")))
+
+    #image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./figures/ambiguous.png")))
+
+    #image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./figures/neutral.png")))
+
+    #ylims!.(ax, 0.6, 1.6)
+
+    f[1, 2] = Legend(f, ax, framevisible = false)
+
+    if save_plot
+        save("faces_RT_model.png", f, pt_per_unit=1)
     end
 
     f
@@ -452,10 +506,10 @@ function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, k
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function figure_acc_aggressiveness(df, session; save_plot=false)
+function figure_faces_psychophysics(df::DataFrame, session; save_plot=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
-    df_agr = read_aggressiveness(df)
+    df_agr = read_aggressiveness(df; normalize=true)
     add_data!(df, df_agr)
 
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -463,7 +517,7 @@ function figure_acc_aggressiveness(df, session; save_plot=false)
         f[1, 1], 
         title = "",
         xlabel = "Aggressiveness",
-        xticks = 0:10,
+        xticks = (-4.5:4.5, ["$(i)" for i in Base.OneTo(10)]),
         yticks = 0:0.2:1,
         ylabel = "Probability of friend response"
     )
@@ -495,13 +549,13 @@ function figure_acc_aggressiveness(df, session; save_plot=false)
     f[1, 2] = Legend(f, ax, framevisible = false)
 
     if save_plot
-        save(string("task3_acc_aggress_$(session)", ".png"), f, pt_per_unit=1)
+        save(string("faces_psychophysics_ses_$(session)", ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_psychophysics_model(df, res; save_plot=false)
+function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save_plot=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df)
@@ -512,7 +566,7 @@ function figure_faces_psychophysics_model(df, res; save_plot=false)
         f[1, 1], 
         title = "",
         xlabel = "Aggressiveness",
-        xticks = 0:10,
+        xticks = (-4.5:4.5, ["$(i)" for i in Base.OneTo(10)]),
         yticks = 0:0.2:1,
         ylabel = "Probability of friend response"
     )
@@ -532,7 +586,7 @@ function figure_faces_psychophysics_model(df, res; save_plot=false)
     f[1, 2] = Legend(f, ax, framevisible = false)
 
     if save_plot
-        save(string("faces_acc_aggress_model.png"), f, pt_per_unit=1)
+        save("faces_psychophysics_model.png", f, pt_per_unit=1)
     end
 
     f
