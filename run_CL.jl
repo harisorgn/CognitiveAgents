@@ -1,7 +1,6 @@
 using CognitiveAgents
-using DataFrames
-using OptimizationNLopt
-using OptimizationBBO
+using Serialization
+using OptimizationOptimJL
 
 cols = [
     :subject_id,
@@ -28,22 +27,14 @@ filter!(r -> r.phase == "test", df)
 
 IDs = unique(df.subject_id)
 
-# Task 1
 σ_conv = 5
 grid_sz = (50,50)
 
-df_subj = subset(df, :subject_id => id -> id .== IDs[1], :run => r -> r.==1)
+df_fit = df[(df.subject_id .== 1) .& (df.run .== 1) .& (df.session .== "bhb"), :]
 
-S = get_stimuli(df_subj; grid_sz, σ_conv)
-corrects = get_correct_categories(df_subj)
-env = CategoryLearnEnv(S, corrects)
+alg = Optim.IPNewton()
+res = fit_CL(df_fit, alg; grid_sz, σ_conv)
 
-η = 0.05
-ηₓ = 0.05
-α = 1
-agent = EMAgent(S; η, ηₓ, α, σ²=2)
+#d = run_CL_task(df_fit, res)
 
-choices = run_task!(agent, env)
-
-alg = GridSearch(0.01)
-res = fit_model(S, choices, corrects, alg; grid_sz, σ_conv)
+figure_subject_accuracy(df_fit, res)
