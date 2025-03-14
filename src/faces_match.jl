@@ -116,8 +116,8 @@ function results_to_dataframe(results)
     return df
 end
 
-function results_to_regressors(res::FacesResult, df)
-    df_regress = DataFrame(t = Float64[], P_chosen = Float64[], P_unchosen = Float64[], P_left = Float64[], P_right = Float64[])
+function results_to_regressors(res::FacesResult, df; trial_duration=4)
+    df_regress = DataFrame(t = Float64[], evidence = Float64[])
 
     aggressiveness = df.score
 
@@ -127,11 +127,13 @@ function results_to_regressors(res::FacesResult, df)
     drifts = drift_intercept .+ drift_slope .* aggressiveness
 
     for t in eachindex(RT)
+        ev = drifts[t] * RT[t]
+        t_trial = RT[t] + (t - 1) * trial_duration
         push!(
             df_regress, 
-            (t = t_dot, P_chosen = P[C[t]], P_unchosen = P[idx_unchosen], P_left = P[1], P_right = P[2])
+            (t = t_trial, evidence = ev)
         )
     end
 
-    CSV.write("CM_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
+    CSV.write("faces_regress_sub-$(only(res.subject_ID))_ses-$(only(res.session))_run-$(only(res.run)).csv", df_regress)
 end
