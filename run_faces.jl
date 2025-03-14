@@ -20,9 +20,11 @@ df = read_data_bipolar(files, cols)
 
 IDs = unique(df.subject_id)
 
-df_fit = df[(df.subject_id .== 9) .& (df.run .== 1), :]
+df_fit = df[(df.subject_id .== 3) .& (df.run .== 1) .& (df.session .== "bhb"), :]
 
 alg = Optim.IPNewton()
 res = fit_faces(df_fit, alg)
 
-figure_faces_psychophysics_model(df_fit, res)
+figure_faces_psychophysics(df_fit, res)
+
+figure_faces_RT(df_fit, res)
