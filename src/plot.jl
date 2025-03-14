@@ -1,8 +1,23 @@
-function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)); name="", save=false, title="")
-    IDs = unique(df[!, :subject_id])    
+function plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; label="", kwargs...)
     sets = unique(df[!, :set])
+    N_points = N_trials_per_set / N_trials_average
 
+    xs = collect(1:N_points)
+    for s in sets
+        corrects = get_corrects(df[df.set .== s, :])
+        acc = mean.(partition(corrects, N_trials_average))
+    
+        scatter!(ax, xs, acc; kwargs... )
+        lines!(ax, xs, acc; label, kwargs...)
+        
+        xs .+= N_points
+    end
+end
+
+function figure_subject_accuracy(df; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save=false, title="")
     colormap = ColorSchemes.seaborn_bright.colors
+
+    sets = unique(df[!, :set])
 
     N_points_per_set = N_trials_per_set / N_trials_average
     xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
@@ -16,24 +31,52 @@ function plot_subject_accuracy(df, N_trials_per_set=20, N_trials_average::Int=In
     )
     hidexdecorations!(ax, ticklabels = false)
 
-    for (i,ID) in enumerate(IDs)
-        xs = collect(1:N_points_per_set)
-        for (j,s) in enumerate(sets)
-            choices = parse.(Bool, df[(df.subject_id .== ID) .& (df.set .== s), :correct])
-            acc = mean.(partition(choices, N_trials_average))
-        
-            scatter!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
-            lines!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
-            
-            xs .+= N_points_per_set
-        end
+    gdf = groupby(df, :subject_id)
+    for (i,df_subj) in enumerate(gdf)
+        color = (colormap[mod(i, length(colormap))+1], 0.3)
+        plot_subject_accuracy!(ax, df_subj, N_trials_per_set, N_trials_average; color)
     end
 
     vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
 
     if save
-        save(string("subject_acc_", name, ".png"), f, pt_per_unit=1)
+        save(string("CL_subject_acc_", name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
+function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save=false, title="")
+    colormap = ColorSchemes.seaborn_bright.colors
+
+    sets = unique(df[!, :set])
+
+    N_points_per_set = N_trials_per_set / N_trials_average
+    xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
+    
+    f = Figure(;size = (1024, 768), fontsize=26)
+    ax = Axis(
+        f[1, 1], 
+        title = title,
+        ylabel = "Accuracy",
+        xticks = (xlabel_ticks , ["Set 1", "Set 2", "Set 3", "Set 4"])
+    )
+    hidexdecorations!(ax, ticklabels = false)
+
+    plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; color = colormap[1], label = "Data")
+
+    df_sim = run_CL_task(df, res)
+
+    plot_subject_accuracy!(ax, df_sim, N_trials_per_set, N_trials_average; color = colormap[2], label = "Model")
+
+    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
+    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
+
+    f[1, 2] = Legend(f, ax, framevisible = false, unique = true)
+
+    if save
+        save(string("CL_subject_acc_", name, ".png"), f, pt_per_unit=1)
     end
 
     f
