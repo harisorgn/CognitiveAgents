@@ -30,11 +30,11 @@ IDs = unique(df.subject_id)
 σ_conv = 5
 grid_sz = (50,50)
 
-df_fit = df[(df.subject_id .== 10) .& (df.run .== 1) .& (df.session .== "bhb"), :]
+df_fit = df[(df.subject_id .== 11) .& (df.run .== 1) .& (df.session .== "bhb"), :]
 
 alg = Optim.IPNewton()
 res = fit_CL(df_fit, alg; grid_sz, σ_conv)
 
 #d = run_CL_task(df_fit, res)
 
-figure_subject_accuracy(df_fit, res; N_trials_average=5)
+figure_subject_accuracy(df_fit, res; N_trials_average=5, save_fig=true)

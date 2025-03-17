@@ -27,9 +27,9 @@ filter!(r -> r.phase == "test", df)
 
 IDs = unique(df.subject_id)
 
-df_fit = df[(df.subject_id .== 9) .& (df.run .== 1) .& (df.session .== "bhb"), :]
+df_fit = df[(df.subject_id .== 11) .& (df.run .== 1) .& (df.session .== "bhb"), :]
 
 alg = Optim.IPNewton()
 res = fit_CM(df_fit, alg)
 
-figure_CM_psychophysics(df_fit, res; N_points=10)
+figure_CM_psychophysics(df_fit, res; N_points=10, save_fig=true)
