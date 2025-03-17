@@ -47,7 +47,7 @@ function figure_subject_accuracy(df; N_trials_per_set=20, N_trials_average::Int=
     f
 end
 
-function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save=false, title="")
+function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save_fig=false, title="")
     colormap = ColorSchemes.seaborn_bright.colors
 
     sets = unique(df[!, :set])
@@ -75,7 +75,7 @@ function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_tria
 
     f[1, 2] = Legend(f, ax, framevisible = false, unique = true)
 
-    if save
+    if save_fig
         save(string("CL_subject_acc.png"), f, pt_per_unit=1)
     end
 
@@ -427,7 +427,7 @@ function plot_RT_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
     errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
 end
 
-function figure_faces_RT(df::DataFrame, session; save=false)
+function figure_faces_RT(df::DataFrame, session; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -463,14 +463,14 @@ function figure_faces_RT(df::DataFrame, session; save=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save
+    if save_fig
         save("faces_RT_ses_$(session).png", f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_RT(df::DataFrame, res::FacesResult; save=false)
+function figure_faces_RT(df::DataFrame, res::FacesResult; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -497,7 +497,7 @@ function figure_faces_RT(df::DataFrame, res::FacesResult; save=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save
+    if save_fig
         save("faces_RT_model.png", f, pt_per_unit=1)
     end
 
@@ -549,7 +549,7 @@ function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, k
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function figure_faces_psychophysics(df::DataFrame, session; save=false)
+function figure_faces_psychophysics(df::DataFrame, session; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df; normalize=true)
@@ -591,14 +591,14 @@ function figure_faces_psychophysics(df::DataFrame, session; save=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save
+    if save_fig
         save(string("faces_psychophysics_ses_$(session)", ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save=false)
+function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df)
@@ -628,7 +628,7 @@ function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save=false)
 
     f[1, 2] = Legend(f, ax, framevisible = false)
 
-    if save
+    if save_fig
         save("faces_psychophysics_model.png", f, pt_per_unit=1)
     end
 
@@ -887,7 +887,7 @@ function figure_faces_model(df; save=false)
     f
 end
 
-function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save = false)
+function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save_fig = false)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
     RD = get_response_dots(df)
@@ -915,14 +915,20 @@ function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save
     f = Figure(;size = (1280, 720), fontsize=26)
     ax = Axis(f[1,1], xlabel = "Likelihood difference", ylabel = "Probability of category 2")
 
-    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue, markersize = 10)
+    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue, label = "Data")
     
     r = range(minimum(Delta_llhood), maximum(Delta_llhood); length=1000)
     
     β, P_lapse = res.sol
     P_right_model = last.(probability_choices.(-r, β, P_lapse))
 
-    lines!(ax, r, P_right_model; color=:orange, linewidth = 10)
+    lines!(ax, r, P_right_model; color=:orange, label = "Model")
+
+    f[1, 2] = Legend(f, ax, framevisible = false)
+    
+    if save_fig
+        save(string("CM_psychophysics_model.png"), f, pt_per_unit=1)
+    end
 
     f
 end
