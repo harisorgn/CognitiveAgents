@@ -1,4 +1,4 @@
-function plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; label="", kwargs...)
+function plot_subject_accuracy!(ax::Axis, df::DataFrame, N_trials_per_set, N_trials_average; label="", kwargs...)
     sets = unique(df[!, :set])
     N_points = N_trials_per_set / N_trials_average
 
@@ -6,6 +6,23 @@ function plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; labe
     for s in sets
         corrects = get_corrects(df[df.set .== s, :])
         acc = mean.(partition(corrects, N_trials_average))
+    
+        scatter!(ax, xs, acc; kwargs... )
+        lines!(ax, xs, acc; label, kwargs...)
+        
+        xs .+= N_points
+    end
+end
+
+function plot_subject_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_trials_average; label="", kwargs...)
+    sets = unique(combine(gdf, :set).set)
+    N_points = N_trials_per_set / N_trials_average
+
+    df = combine(gdf, :correct => mean => :accuracy, :set => only ∘ unique => :set)
+
+    xs = collect(1:N_points)
+    for s in sets
+        acc = mean.(partition(df[df.set .== s, :accuracy], N_trials_average))
     
         scatter!(ax, xs, acc; kwargs... )
         lines!(ax, xs, acc; label, kwargs...)
@@ -66,9 +83,9 @@ function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_tria
 
     plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; color = colormap[1], label = "Data")
 
-    df_sim = run_CL_task(df, res)
-
-    plot_subject_accuracy!(ax, df_sim, N_trials_per_set, N_trials_average; color = colormap[2], label = "Model")
+    df_sim = run_CL_task(df, res; N_runs = 100)
+    gdf_sim = groupby(df_sim, :trial_index)
+    plot_subject_accuracy!(ax, gdf_sim, N_trials_per_set, N_trials_average; color = colormap[2], label = "Model")
 
     vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
