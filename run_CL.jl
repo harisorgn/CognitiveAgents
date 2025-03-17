@@ -1,6 +1,7 @@
 using CognitiveAgents
 using Serialization
 using OptimizationOptimJL
+using DataFramesMeta
 
 cols = [
     :subject_id,
@@ -29,12 +30,19 @@ IDs = unique(df.subject_id)
 
 σ_conv = 5
 grid_sz = (50,50)
-
-df_fit = df[(df.subject_id .== 11) .& (df.run .== 1) .& (df.session .== "bhb"), :]
-
 alg = Optim.IPNewton()
-res = fit_CL(df_fit, alg; grid_sz, σ_conv)
 
-#d = run_CL_task(df_fit, res)
+run = 1
+session = "glc"
+for ID in IDs
+    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-figure_subject_accuracy(df_fit, res; N_trials_average=5, save_fig=true)
+    res = fit_CL(df_fit, alg; grid_sz, σ_conv)
+    
+    serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).csv", res)
+
+    results_to_regressors(res, df)
+end
+
+
+#figure_subject_accuracy(df_fit, res; N_trials_average=4, save_fig=false)
