@@ -198,11 +198,6 @@ function loglikelihood_stimulus(stim, S̄, N; σ²=1)
     return loglhood
 end
 
-
-function loglikelihood_category(P_right_cat, cat)
-    return cat * log(P_right_cat + eps()) + (1 - cat) * log(1 - P_right_cat + eps())
-end
-
 function logprior(k, z, t; β=1)
     t_past = Base.OneTo(t-1)
   
@@ -301,4 +296,105 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     S = stimuli(df; grid_sz, σ_conv)
 
     return fit_model(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
+end
+
+function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+    choices = get_choices(df)
+    corrects = get_correct_categories(df)
+    S = get_stimuli(df; grid_sz, σ_conv)
+
+    lb = [0, 0]
+    ub = [1.0, Inf]
+    
+    if alg isa GridSearch
+        step_sz = alg.step_size
+        r1 = lb[1]:step_sz:ub[1]
+        r2 = lb[2]:step_sz:ub[2]
+        OBJ = zeros(length(r1), length(r2))
+        for (i, p1) in enumerate(r1)
+            for (j, p2) in enumerate(r2)
+                OBJ[i, j] = obj([p1, p2], nothing)
+            end
+        end
+
+        sol = OBJ
+    else
+        obj = OptimizationFunction(
+            (p, hyperp) -> objective(S, choices, corrects, p), 
+            Optimization.AutoForwardDiff()
+        )
+        p0 = [0.1, 1]
+        prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
+        sol = solve(prob, alg; kwargs...)
+    end
+
+    id = unique(df.subject_id)
+    session = unique(df.session)
+    run = unique(df.run)
+
+    res = CLResult(sol, grid_sz, σ_conv, id, session, run)
+
+    return res
+end
+
+
+function results_to_regressors(res::CLResult, df)
+    df_regress = DataFrame(
+        t_loglikelihood = Float64[],
+        t_RPE_pos = Float64[],
+        t_RPE_neg = Float64[], 
+        loglikelihood = Float64[], 
+        RPE_pos = Float64[],
+        RPE_neg = Float64[]
+    )
+
+    df_fit = df[(df.subject_id .== res.subject_ID) .& (df.run .== res.run) .& (df.session .== res.session), :]
+    ST = parse.(Float64, df_fit.stim_presentation_time)
+    RT = parse.(Float64, df_fit.response_time)
+
+    C = choices(df_fit)
+    X = stimuli(df_fit; grid_sz=res.image_size, σ_conv=res.σ_convolution)
+    D, N_trials = size(X)
+
+    ag = initialise_agent(X, res.sol)
+    tm = TrialMetrics(N_trials)
+    EM_learning!(ag, X, C, tm)
+
+    for t in Base.OneTo(N_trials)
+        
+        z_stim = ag.z_stim[t]
+        loglikelihood = tm.loglhood[t][z_stim] 
+
+        z = ag.z[t]
+        w = t == 1 ? zeros(D) : tm.W[t-1][:, z]
+        logq = tm.logq[t][z]
+        pred_cat = probability_right_category(X[:, t], w)
+        RPE = prediction_error(C[t], pred_cat, ag.η, logq)
+
+        if RPE > 0.0
+            t_RPE_pos = ST[t] + RT[t]
+            RPE_pos = RPE
+            t_RPE_neg = 0.0
+            RPE_neg = 0.0
+        else
+            t_RPE_pos = 0.0
+            RPE_pos = 0.0
+            t_RPE_neg = ST[t] + RT[t]
+            RPE_neg = RPE
+        end
+
+        push!(
+            df_regress, 
+            (
+                t_loglikelihood = ST[t], 
+                t_RPE_pos = t_RPE_pos,
+                t_RPE_neg = t_RPE_neg, 
+                loglikelihood = loglikelihood, 
+                RPE_pos = RPE_pos,
+                RPE_neg = RPE_neg
+            )
+        )
+    end
+
+    CSV.write("CL_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
 end
