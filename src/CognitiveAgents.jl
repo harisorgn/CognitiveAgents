@@ -13,6 +13,7 @@ using Optim
 using DelimitedFiles: readdlm
 using CSV
 using DataFrames
+using DataFramesMeta
 
 using SequentialSamplingModels: DDM
 
@@ -45,5 +46,6 @@ export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
 export objective, category_match, fit_CL, fit_CM, fit_CM, fit_faces, run_CL_task
 export plot_subject_accuracy, plot_group_accuracy, plot_group_accuracy_per_set, plot_rt
 export figure_CM_psychophysics, figure_faces_psychophysics, figure_faces_RT, figure_subject_accuracy
+export results_to_regressors
 
 end 
