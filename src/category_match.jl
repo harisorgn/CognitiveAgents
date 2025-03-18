@@ -94,31 +94,39 @@ function fit_CM(df, alg; kwargs...)
 end
 
 function results_to_regressors(res::CMResult, df; inter_dot_interval = 0.55)
-    df_regress = DataFrame(t = Float64[], P_chosen = Float64[], P_unchosen = Float64[], P_left = Float64[], P_right = Float64[])
+    subject_ID = only(res.subject_ID)
+    run = only(res.run)
+    session = only(res.session)
 
-    df_fit = df[(df.subject_id .== res.subject_ID) .& (df.run .== res.run) .& (df.session .== res.session), :]
+    df_fit = @subset(df, :subject_id .== subject_ID, :run .== run, :session .== session)
+    
+    df_regress = DataFrame(t = Float64[], P_chosen = Float64[], P_unchosen = Float64[], P_left = Float64[], P_right = Float64[])
 
     ST = parse.(Float64, df_fit.stim_presentation_time)
     RT = parse.(Float64, df_fit.response_time)
 
     RD = get_response_dots(df_fit)
     L = get_loglikelihood_dots(df_fit)
-    C = choicesp1(df_fit)
+    C = get_choicesp1(df_fit)
 
-    β, σ_inf = res.sol
+    β, P_lapse = res.sol
+
     for t in eachindex(RT)
         for d in Base.OneTo(RD[t])
             t_dot = ST[t] + d*inter_dot_interval
-            P = probability_choices(L[t], d, σ_inf, β)
-            idx_unchosen = C[t] == 1 ? 2 : 1
+            choice_cat = C[t]
+
+            Ps = probability_choices(L[t], d, β, P_lapse)
+
+            idx_unchosen = choice_cat == 2 ? 1 : 2
             push!(
                 df_regress, 
-                (t = t_dot, P_chosen = P[C[t]], P_unchosen = P[idx_unchosen], P_left = P[1], P_right = P[2])
+                (t = t_dot, P_chosen = Ps[choice_cat], P_unchosen = Ps[idx_unchosen], P_left = Ps[1], P_right = Ps[2])
             )
         end
     end
 
-    CSV.write("CM_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
+    CSV.write("CM_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end
 
 function results_to_dataframe(results::CMResult)
