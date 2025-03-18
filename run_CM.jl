@@ -1,6 +1,7 @@
 using CognitiveAgents
 using Serialization
 using OptimizationOptimJL
+using DataFramesMeta
 
 cols = [
     :subject_id,
@@ -25,11 +26,18 @@ filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 df = read_data_bipolar(files, cols)
 filter!(r -> r.phase == "test", df)
 
+run = 1
+session = "bhb"
 IDs = unique(df.subject_id)
-
-df_fit = df[(df.subject_id .== 11) .& (df.run .== 1) .& (df.session .== "bhb"), :]
-
 alg = Optim.IPNewton()
-res = fit_CM(df_fit, alg)
+for ID in [104]
+    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-figure_CM_psychophysics(df_fit, res; N_points=10, save_fig=true)
+    res = fit_CM(df_fit, alg)
+    
+    serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).csv", res)
+
+    results_to_regressors(res, df)
+end
+
+#figure_CM_psychophysics(df_fit, res; N_points=10, save_fig=true)
