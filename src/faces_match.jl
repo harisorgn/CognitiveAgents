@@ -116,24 +116,39 @@ function results_to_dataframe(results)
     return df
 end
 
-function results_to_regressors(res::FacesResult, df; trial_duration=4)
+function results_to_regressors(res::FacesResult, df; trial_duration=4, T_sample=0.4)
+    subject_ID = only(res.subject_ID)
+    run = only(res.run)
+    session = only(res.session)
+
+    df_fit = @subset(df, :subject_id .== subject_ID, :run .== run, :session .== session)
+    df_agr = read_aggressiveness(df_fit; normalize=false)
+    add_data!(df_fit, df_agr)
+
     df_regress = DataFrame(t = Float64[], evidence = Float64[])
 
-    aggressiveness = df.score
-
-    RT = get_response_times(df)
+    aggressiveness = df_fit.score
+    RTs = get_response_times(df_fit)
 
     α, τ, z, drift_intercept, drift_slope = res.sol
     drifts = drift_intercept .+ drift_slope .* aggressiveness
 
-    for t in eachindex(RT)
-        ev = drifts[t] * RT[t]
-        t_trial = RT[t] + (t - 1) * trial_duration
-        push!(
-            df_regress, 
-            (t = t_trial, evidence = ev)
-        )
+    for (i, RT) in enumerate(RTs)
+        t_regress = if RT > T_sample
+            range(T_sample, RT, step = T_sample)
+        else
+            [RT]
+        end
+
+        for t in t_regress
+            ev = drifts[i] * t
+            t_sample = t + (i - 1) * trial_duration
+            push!(
+                df_regress, 
+                (t = t_sample, evidence = ev)
+            )
+        end
     end
 
-    CSV.write("faces_regress_sub-$(only(res.subject_ID))_ses-$(only(res.session))_run-$(only(res.run)).csv", df_regress)
+    CSV.write("faces_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end
