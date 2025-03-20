@@ -295,7 +295,7 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     corrects = get_correct_categories(df)
     S = stimuli(df; grid_sz, σ_conv)
 
-    return fit_model(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
+    return fit_EM(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
 end
 
 function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
