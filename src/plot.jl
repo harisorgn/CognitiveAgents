@@ -64,7 +64,7 @@ function figure_subject_accuracy(df; N_trials_per_set=20, N_trials_average::Int=
     f
 end
 
-function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save_fig=false, title="")
+function figure_subject_accuracy(df, res::CLResult; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save_fig=false, title="")
     colormap = ColorSchemes.seaborn_bright.colors
 
     sets = unique(df[!, :set])
@@ -99,154 +99,56 @@ function figure_subject_accuracy(df, res::CLResult,; N_trials_per_set=20, N_tria
     f
 end
 
-function group_accuracy_per_set!(ax, df, N_trials_per_set)
-    IDs = unique(df[!, :subject_id])    
-    sets = unique(df[!, :set])
+function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_subjects; label="", colormap=ColorSchemes.seaborn_bright.colors)
+    sets = unique(combine(gdf, :set).set)
+    N_points = N_trials_per_set
+    
+    df = combine(
+        gdf, 
+        :correct => mean => :accuracy, 
+        :correct => (c -> std(c) ./ N_subjects) => :sem_accuracy,
+        :set => only ∘ unique => :set
+    )
+    @show df
+    xs = collect(1:N_points)
+    for s in sets
+        acc = df[df.set .== s, :accuracy]
+        sem_acc = df[df.set .== s, :sem_accuracy]
 
-    RESP = []
-    for (i,s) in enumerate(sets)
-        corrects = []
-        for ID in IDs
-            c = df[(df.subject_id .== ID) .& (df.set .== s), :correct]
-            if length(c) == N_trials_per_set
-                push!(corrects, parse.(Bool, c))
-            end
-        end
-        if !isempty(corrects)
-            push!(RESP, reduce(hcat, corrects))
-        end
-    end
+        scatter!(ax, xs, acc; color = colormap[1])
+        lines!(ax, xs, acc; label, color = colormap[1])
+        band!(ax, xs, acc .- sem_acc, acc .+ sem_acc; color = (colormap[2], 0.3))
 
-    A = [vec(mean(R; dims=2)) for R in RESP]
-
-    xs = collect(1:N_trials_per_set)
-
-    for acc in A
-        scatter!(ax, xs, acc, color=:black)
-        lines!(ax, xs, acc, color=(:black, 1))
-        vlines!(ax, [last(xs)], linestyle = :dash, linewidth = 2, color=:gray)
-        xs .+= N_trials_per_set
+        xs .+= N_points
     end
 end
 
-function plot_group_accuracy_per_set(df, N_trials_per_set; name="", save=false, title="", N_training=0)
+function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", save_fig=false, title="")
+    colormap = ColorSchemes.seaborn_bright.colors
+
+    sets = unique(df[!, :set])
+
+    N_points_per_set = N_trials_per_set
+    xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
     
-    f = Figure(;size = (1024, 768), fontsize=30)
+    f = Figure(;size = (1024, 768), fontsize=26)
     ax = Axis(
         f[1, 1], 
         title = title,
-        xlabel = "Trial",
-        ylabel = "Accuracy"
-    )
-
-    group_accuracy_per_set!(ax, df, N_trials_per_set)
-
-    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
-
-    if save
-        save(string("group_acc_per_set_", name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function group_accuracy!(ax, df, N_trials_per_set; color=:black, kwargs...)
-    IDs = unique(df[!, :subject_id])    
-    sets = unique(df[!, :set])
-    N_subjects = length(IDs)
-
-    RESP = []
-    for (i, s) in enumerate(sets)
-        corrects = Matrix{Union{Missing, Bool}}(undef, N_subjects, N_trials_per_set)
-        for (j, ID) in enumerate(IDs)
-            c = df[(df.subject_id .== ID) .& (df.set .== s), :correct]
-            corrects[j, 1:length(c)] = parse.(Bool, c)
-        end
-        push!(RESP, corrects)
-    end
-    
-    M = mapreduce(hcat, RESP) do R
-        map(eachcol(R)) do R_trial
-            mean(skipmissing(R_trial))
-        end
-    end
-    xs = collect(1:N_trials_per_set)
-
-    for (i, acc) in enumerate(eachcol(M))
-        #scatter!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
-        #lines!(ax, xs, acc, color=(colormap[mod(i, length(colormap))+1], 0.3))
-    end
-
-    μ_group = vec(mean(M; dims=2))
-    σ_group = vec(std(M; dims=2)) ./ sqrt(N_subjects)
-
-    scatter!(ax, xs, μ_group; color=(color, 1))
-    lines!(ax, xs, μ_group, color=(color, 1); kwargs...)
-    band!(ax, xs, μ_group .- σ_group, μ_group .+ σ_group, color=(color, 0.3))
-
-end
-
-function plot_group_accuracy(df, N_trials_per_set=20; name="", label="", save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1024, 768), fontsize=30)
-    ax = Axis(
-        f[1, 1], 
-        title = "",
-        xlabel = "Trial",
         ylabel = "Accuracy",
-        yticks = 0.0:0.2:1.0
+        xticks = (xlabel_ticks , ["Set $(s)" for s in sets])
     )
+    hidexdecorations!(ax, ticklabels = false)
 
-    group_accuracy!(ax, df, N_trials_per_set; color=colormap[1], label)
+    N_subjects = length(unique(df[!, :subject_id]))  
+    gdf = groupby(df, :trial_index)
+    plot_group_accuracy!(ax, gdf, N_trials_per_set, N_subjects; colormap)
 
+    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
-    ylims!(ax, 0, 1)
 
-    f[1, 2] = Legend(f, ax, framevisible = false)
-
-    if save
-        save(string("group_acc_", name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_group_accuracy(df, N_trials_per_set, session; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1024, 768), fontsize=30)
-    ax = Axis(
-        f[1, 1], 
-        title = "",
-        xlabel = "Trial",
-        ylabel = "Accuracy",
-        yticks = 0.0:0.2:1.0
-    )
-
-    group_accuracy!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==1),:], 
-        N_trials_per_set; 
-        color=colormap[1],
-        label = "Control"
-    )
-
-    group_accuracy!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==2),:], 
-        N_trials_per_set; 
-        color=colormap[2],
-        label = session.=="glc" ? "Glucose" : "BHB"
-    )
-
-    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
-    ylims!(ax, 0, 1)
-
-    f[1, 2] = Legend(f, ax, framevisible = false)
-
-    if save
-        save(string("task1_new_acc_$(session)", ".png"), f, pt_per_unit=1)
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
