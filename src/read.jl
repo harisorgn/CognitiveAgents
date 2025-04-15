@@ -94,7 +94,7 @@ function read_data_bipolar(files, cols; include_omissions=false)
         end
     end
 
-    df.correct .= parse.(Int, df.correct)
+    df.correct .= parse.(Bool, lowercase.(df.correct))
     return df
 end
 
