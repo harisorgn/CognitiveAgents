@@ -155,8 +155,6 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
 end
 
 function plot_cumulative_RT!(ax::Axis, gdf::GroupedDataFrame, xs; colormap=ColorSchemes.seaborn_bright.colors)
-    N_subjects = length(gdf)
-
     for (i, df_subj) in enumerate(gdf) 
         RT = df_subj.response_time
         filter!(r -> r != "None", RT)
@@ -166,24 +164,6 @@ function plot_cumulative_RT!(ax::Axis, gdf::GroupedDataFrame, xs; colormap=Color
         
         lines!(ax, xs, f.(xs); label, color = colormap[mod(i, length(colormap))+1])
     end
-    
-
-    #=
-    cum_RT = mapreduce(hcat, enumerate(gdf)) do (i, df_subj) 
-        RT = df_subj.response_time
-        filter!(r -> r != "None", RT)
-        RT = parse.(Float64, RT)
-        
-        f = ecdf(RT)
-        f.(xs)
-    end
-    
-    μ_RT = vec(mean(cum_RT; dims=2))
-    σ_RT = vec(std(cum_RT; dims=2)) ./ N_subjects
-
-    lines!(ax, xs, μ_RT; label, color = colormap[1])
-    band!(ax, xs, μ_RT .- σ_RT, μ_RT .+ σ_RT; color = (colormap[2], 0.3))
-    =#
 end
 
 function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="")
@@ -209,7 +189,7 @@ function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="
     f
 end
 
-function plot_RT!(ax::Axis, df::DataFrame; colormap=ColorSchemes.seaborn_bright.colors)
+function plot_RT!(ax::Axis, df::DataFrame; color)
     RT = get_response_times(df)
     aggressiveness = df.score
     scores = sort(unique(aggressiveness))
@@ -224,9 +204,15 @@ function plot_RT!(ax::Axis, df::DataFrame; colormap=ColorSchemes.seaborn_bright.
         std(skipmissing(RT[idx])) / sqrt(count(.!ismissing.(RT[idx])))
     end
 
-    lines!(ax, scores, μ_RT_score; color=colormap[1])
-    scatter!(ax, scores, μ_RT_score; color=colormap[1])
-    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color=colormap[1])
+    lines!(ax, scores, μ_RT_score; color)
+    scatter!(ax, scores, μ_RT_score; color)
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
+end
+
+function plot_RT!(ax::Axis, gdf::GroupedDataFrame; colormap=ColorSchemes.seaborn_bright.colors)
+    for (i, df) in enumerate(gdf)
+        plot_RT!(ax, df; color = )
+    end
 end
 
 function plot_RT!(ax, res::FacesResult, scores; colormap=ColorSchemes.seaborn_bright.colors)
