@@ -18,6 +18,7 @@ files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 
 df = read_data_bipolar(files, cols)
+filter!(r -> (r.subject_id <= 99) .& (r.run == 1), df)
 
 IDs = unique(df.subject_id)
 
