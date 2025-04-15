@@ -197,6 +197,7 @@ function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="
         xticks = first(xlims):last(xlims),
         ylabel = "Cumulative Probability"
     )
+
     gdf = groupby(df, :subject_id)
     xs = first(xlims):0.001:last(xlims)
     plot_cumulative_RT!(ax, gdf, xs; colormap)
@@ -208,107 +209,7 @@ function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="
     f
 end
 
-function plot_RT!(ax, df; color=:black)
-    RT = get_response_times(df)
-
-    hist!(ax, RT; bins=50, color = (color, 0.3))
-    vlines!(ax, median(RT); linestyle = :dash, linewidth = 2, color)
-end
-
-function plot_rt(df; name="", save=false, title="", N_training=0)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1024, 768), fontsize=30)
-    ax = Axis(
-        f[1, 1], 
-        title = title,
-        xlabel = "Response time [sec]",
-        xticks = 0.0:0.5:10
-    )
-
-    plot_RT!(ax, df; color=colormap[1])
-
-    if save
-        save(string("RT_", name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_model_params(res, labels; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    N_subjects, N_conditions = size(res)
-
-    f = Figure(;size = (1024, 768))
-    ax = [
-        Axis(
-            f[1, 1], 
-            title = "β : inverse temperature",
-            xticks = ([1,2], labels)
-        ),
-        Axis(
-            f[1, 2], 
-            title = "σ : inference noise",
-            xticks = ([1,2], labels)
-        )
-    ]        
-
-    ylims!.(ax, 0, 4)
-
-    for i in Base.OneTo(N_subjects)
-        β = map(x -> x.β, res[i, :])
-        σ = map(x -> x.σ_inf, res[i, :])
-
-        scatter!(ax[1], 1:N_conditions, β; color=(colormap[mod(i, length(colormap))+1], 0.8))
-        lines!(ax[1], 1:N_conditions, β; color=(colormap[mod(i, length(colormap))+1], 0.8))
-
-        scatter!(ax[2], 1:N_conditions, σ; color=(colormap[mod(i, length(colormap))+1], 0.8))
-        lines!(ax[2], 1:N_conditions, σ; color=(colormap[mod(i, length(colormap))+1], 0.8))
-    end        
-
-    if save
-        save(string(join(labels, "_VS_"), ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_prob_choice(L, β, σ; save=false)
-    N_dots, N_categories = size(L)
-
-    P = zeros(N_dots, N_categories)
-
-    for dot in Base.OneTo(N_dots)
-        evidence = sum(L[1:dot, :]; dims=1)
-
-        samples = rand(MvNormal(vec(evidence), dot*σ), 10_000)
-
-        Ps = softmax(β*samples)
-        P[dot, :] = mean(Ps; dims=2)
-    end
-
-    f = Figure(;size = (1024, 768), fontsize=26)
-    ax = Axis(
-        f[1, 1], 
-        xlabel = "Dot",
-        xticks = 1:N_dots,
-        ylabel = "P(choice | dots)"
-    )
-
-    stairs!(ax, 1:N_dots, P[:,1]; step=:post, label="Left")
-    stairs!(ax, 1:N_dots, P[:,2]; step=:post, label="Right")
-
-    f[1, 2] = Legend(f, ax, "Choice", framevisible = false)
-
-    if save
-        save("example_prob_choice.png", f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_RT_faces!(ax, df; color=:black, kwargs...)
+function plot_RT!(ax::Axis, df::DataFrame; colormap=ColorSchemes.seaborn_bright.colors)
     RT = get_response_times(df)
     aggressiveness = df.score
     scores = sort(unique(aggressiveness))
@@ -323,12 +224,12 @@ function plot_RT_faces!(ax, df; color=:black, kwargs...)
         std(skipmissing(RT[idx])) / sqrt(count(.!ismissing.(RT[idx])))
     end
 
-    lines!(ax, scores, μ_RT_score; color, kwargs...)
-    scatter!(ax, scores, μ_RT_score; color)
-    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
+    lines!(ax, scores, μ_RT_score; color=colormap[1])
+    scatter!(ax, scores, μ_RT_score; color=colormap[1])
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color=colormap[1])
 end
 
-function plot_RT_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
+function plot_RT!(ax, res::FacesResult, scores; colormap=ColorSchemes.seaborn_bright.colors)
     α, τ, z, drift_intercept, drift_slope = res.sol
     N_samples = 10_000
 
@@ -346,12 +247,12 @@ function plot_RT_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
         std(RT) / sqrt(N_samples)
     end
 
-    lines!(ax, scores, μ_RT_score; color, kwargs...)
-    scatter!(ax, scores, μ_RT_score; color)
-    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
+    lines!(ax, scores, μ_RT_score; color=colormap[1])
+    scatter!(ax, scores, μ_RT_score; color=colormap[1])
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color=colormap[1])
 end
 
-function figure_faces_RT(df::DataFrame, session; save_fig=false)
+function figure_RT_faces(df::DataFrame ; save_fig=false, name="")
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -363,32 +264,21 @@ function figure_faces_RT(df::DataFrame, session; save_fig=false)
         ylabel = "Response Time [sec]"
     )
 
-    plot_RT_faces!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==1),:]; 
-        color=colormap[1],
-        label = "Control"
-    )
+    df_agr = read_aggressiveness(df; normalize=false)
+    add_data!(df, df_agr)
 
-    plot_RT_faces!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==2),:]; 
-        color=colormap[2],
-        label = session.=="glc" ? "Glucose" : "BHB"
-    )
+    plot_RT!(ax, df; colormap)
  
-    image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./figures/angry.png")))
+    image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./stimuli/face_angry.png")))
  
-    image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./figures/ambiguous.png")))
+    image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./stimuli/face_ambiguous.png")))
 
-    image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./figures/neutral.png")))
+    image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./stimuli/face_neutral.png")))
 
     #ylims!.(ax, 0.6, 1.6)
 
-    f[1, 2] = Legend(f, ax, framevisible = false)
-
     if save_fig
-        save("faces_RT_ses_$(session).png", f, pt_per_unit=1)
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
@@ -849,6 +739,41 @@ function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save
     
     if save_fig
         save(string("CM_psychophysics_model.png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
+
+function plot_prob_choice(L, β, σ; save=false)
+    N_dots, N_categories = size(L)
+
+    P = zeros(N_dots, N_categories)
+
+    for dot in Base.OneTo(N_dots)
+        evidence = sum(L[1:dot, :]; dims=1)
+
+        samples = rand(MvNormal(vec(evidence), dot*σ), 10_000)
+
+        Ps = softmax(β*samples)
+        P[dot, :] = mean(Ps; dims=2)
+    end
+
+    f = Figure(;size = (1024, 768), fontsize=26)
+    ax = Axis(
+        f[1, 1], 
+        xlabel = "Dot",
+        xticks = 1:N_dots,
+        ylabel = "P(choice | dots)"
+    )
+
+    stairs!(ax, 1:N_dots, P[:,1]; step=:post, label="Left")
+    stairs!(ax, 1:N_dots, P[:,2]; step=:post, label="Right")
+
+    f[1, 2] = Legend(f, ax, "Choice", framevisible = false)
+
+    if save
+        save("example_prob_choice.png", f, pt_per_unit=1)
     end
 
     f
