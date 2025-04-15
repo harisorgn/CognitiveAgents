@@ -109,7 +109,7 @@ function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set,
         :correct => (c -> std(c) ./ N_subjects) => :sem_accuracy,
         :set => only ∘ unique => :set
     )
-    @show df
+    
     xs = collect(1:N_points)
     for s in sets
         acc = df[df.set .== s, :accuracy]
@@ -146,6 +146,60 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
 
     vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
+
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
+function plot_cumulative_RT!(ax::Axis, gdf::GroupedDataFrame, xs; colormap=ColorSchemes.seaborn_bright.colors)
+    N_subjects = length(gdf)
+
+    for (i, df_subj) in enumerate(gdf) 
+        RT = df_subj.response_time
+        filter!(r -> r != "None", RT)
+        RT = parse.(Float64, RT)
+        
+        f = ecdf(RT)
+        
+        lines!(ax, xs, f.(xs); label, color = colormap[mod(i, length(colormap))+1])
+    end
+    
+
+    #=
+    cum_RT = mapreduce(hcat, enumerate(gdf)) do (i, df_subj) 
+        RT = df_subj.response_time
+        filter!(r -> r != "None", RT)
+        RT = parse.(Float64, RT)
+        
+        f = ecdf(RT)
+        f.(xs)
+    end
+    
+    μ_RT = vec(mean(cum_RT; dims=2))
+    σ_RT = vec(std(cum_RT; dims=2)) ./ N_subjects
+
+    lines!(ax, xs, μ_RT; label, color = colormap[1])
+    band!(ax, xs, μ_RT .- σ_RT, μ_RT .+ σ_RT; color = (colormap[2], 0.3))
+    =#
+end
+
+function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="")
+    colormap = ColorSchemes.seaborn_bright.colors
+    
+    f = Figure(;size = (1024, 768), fontsize=30)
+    ax = Axis(
+        f[1, 1], 
+        title = title,
+        xlabel = "Response time [sec]",
+        xticks = first(xlims):last(xlims),
+        ylabel = "Cumulative Probability"
+    )
+    gdf = groupby(df, :subject_id)
+    xs = first(xlims):0.001:last(xlims)
+    plot_cumulative_RT!(ax, gdf, xs; colormap)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
@@ -220,7 +274,6 @@ function plot_model_params(res, labels; save=false)
     f
 end
 
-
 function plot_prob_choice(L, β, σ; save=false)
     N_dots, N_categories = size(L)
 
@@ -250,54 +303,6 @@ function plot_prob_choice(L, β, σ; save=false)
 
     if save
         save("example_prob_choice.png", f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_cumulative_RT!(ax, df, xs; color=:black, kwargs...)
-    RT = df.response_time
-    filter!(r -> r != "None", RT)
-    RT = parse.(Float64, RT)
-    
-    f = ecdf(RT)
-    
-    lines!(ax, xs, f.(xs); color = color, kwargs...)
-    vlines!(ax, median(RT); linestyle = :dash, linewidth = 2, color)
-end
-
-function figure_cumulative_RT(df, session, xs; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1024, 768), fontsize=30)
-    ax = Axis(
-        f[1, 1], 
-        title = "",
-        xlabel = "Response time [sec]",
-        xticks = 0.0:0.5:10,
-        ylabel = "Cumulative Probability"
-    )
-
-    plot_cumulative_RT!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==1),:], 
-        xs; 
-        color=colormap[1],
-        label = "Control"
-    )
-
-    plot_cumulative_RT!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==2),:], 
-        xs; 
-        color=colormap[2],
-        label = session.=="glc" ? "Glucose" : "BHB"
-    )
-
-    f[1, 2] = Legend(f, ax, framevisible = false)
-
-    if save
-        save(string("task2_cRT_$(session)", ".png"), f, pt_per_unit=1)
     end
 
     f
@@ -694,9 +699,6 @@ function plot_posterior_param_diff!(ax, df, param, sessions; colormap = ColorSch
 
     for (i, ID) in enumerate(IDs)
         Δp = map(enumerate(sessions)) do (j,s)
-            @show ID
-            @show s
-            @show param
             df[(df.subject_ID .== ID) .& (df.session .== s) .& (df.run .== 2), param] .- df[(df.subject_ID .== ID) .& (df.session .== s) .& (df.run .== 1), param]
         end
         offset = rand(Normal(0, 0.1))
