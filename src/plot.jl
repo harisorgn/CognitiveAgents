@@ -767,6 +767,27 @@ function figure_CM_psychophysics(df::DataFrame; N_points=10, name="", save_fig=f
     f
 end
 
+function figure_regressor(t_regress, val_regress; pulse_width=1, name="", save_fig=false)
+    ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
+
+    val_padded = zeros(length(ts))
+    for (i, t) in enumerate(t_regress)
+        idx = argmin(abs.(ts .- t))
+        val_padded[idx] = val_regress[i]
+    end
+
+    f = Figure(;size = (1280, 720), fontsize=26)
+    ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = "Probability of left category")
+
+    stairs!(ax, ts, val_padded)
+
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
 
 function plot_prob_choice(L, β, σ; save=false)
     N_dots, N_categories = size(L)
