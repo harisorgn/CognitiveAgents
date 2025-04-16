@@ -716,47 +716,52 @@ function figure_faces_model(df; save=false)
     f
 end
 
-function figure_CM_psychophysics(df::DataFrame, res::CMResult; N_points=10, save_fig = false)
-    L = get_loglikelihood_dots(df)
-    C = get_choices(df)
-    RD = get_response_dots(df)
+function plot_psychophysics_CM!(ax::Axis, gdf::GroupedDataFrame, edges; color)
+    N_subjects = length(gdf)
 
-    z_left = map(enumerate(L)) do (t, loglikelihoods)
-        sum(loglikelihoods[1:RD[t], 1])
+    P_right_choices = mapreduce(hcat, enumerate(gdf)) do (i, df)
+        C = get_choices(df)
+        z_left = get_loglikelihood_choice(df, 1)
+        z_right = get_loglikelihood_choice(df, 2)
+
+        Delta_llhood = z_right .- z_left
+
+        P_right_choices_subject = map(eachindex(edges[1:end-1])) do i
+            idx = findall(Delta_llhood) do Dl
+                (Dl >= edges[i]) && (Dl < edges[i+1])
+            end
+    
+            sum(C[idx]) / length(C[idx])
+        end
+
+        P_right_choices_subject
     end
+    
+    μ_P = vec(mean(P_right_choices; dims=2))
+    sem_P = vec(std(P_right_choices; dims=2) ./ sqrt(N_subjects))
+    
+    scatter!(ax, edges[1:end-1], μ_P; color)
+    lines!(ax, edges[1:end-1], μ_P; color)
+    errorbars!(ax, edges[1:end-1], μ_P, sem_P; color) 
+end
 
-    z_right = map(enumerate(L)) do (t, loglikelihoods)
-        sum(loglikelihoods[1:RD[t], 2])
-    end
+function figure_CM_psychophysics(df::DataFrame; N_points=10, name="", save_fig=false)
+    colormap = ColorSchemes.seaborn_bright.colors
 
+    z_left = get_loglikelihood_choice(df, 1)
+    z_right = get_loglikelihood_choice(df, 2)
     Delta_llhood = z_right .- z_left
 
     edges = range(minimum(Delta_llhood), maximum(Delta_llhood); length=(N_points + 1))
     
-    P_right_choices = map(eachindex(edges[1:end-1])) do i
-        idx = findall(Delta_llhood) do Dl
-            (Dl >= edges[i]) && (Dl < edges[i+1])
-        end
-
-        sum(C[idx]) / length(C[idx])
-    end
-
     f = Figure(;size = (1280, 720), fontsize=26)
-    ax = Axis(f[1,1], xlabel = "Likelihood difference", ylabel = "Probability of category 2")
+    ax = Axis(f[1,1], xlabel = "Likelihood difference (category 2 - category 1)", ylabel = "Probability of category 2")
 
-    scatter!(ax, edges[1:end-1], P_right_choices; color=:blue, label = "Data")
-    
-    r = range(minimum(Delta_llhood), maximum(Delta_llhood); length=1000)
-    
-    β, P_lapse = res.sol
-    P_right_model = last.(probability_choices.(-r, β, P_lapse))
-
-    lines!(ax, r, P_right_model; color=:orange, label = "Model")
-
-    f[1, 2] = Legend(f, ax, framevisible = false)
+    gdf = groupby(df, :subject_id)
+    plot_psychophysics_CM!(ax, gdf, edges; color=colormap[1])
     
     if save_fig
-        save(string("CM_psychophysics_model.png"), f, pt_per_unit=1)
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
