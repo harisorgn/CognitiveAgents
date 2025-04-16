@@ -189,7 +189,57 @@ function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="
     f
 end
 
-function plot_RT!(ax::Axis, df::DataFrame; color)
+function plot_RT!(ax::Axis, gdf::GroupedDataFrame, edges; color=:black, bin_size=0.5)
+    
+    COUNTS = mapreduce(hcat, enumerate(gdf)) do (i, df)
+        RT = get_response_times(df)
+        filter!(r -> !ismissing(r), RT)
+
+        h = fit(Histogram, RT, edges)
+        h_n = normalize(h; mode=:pdf)
+        h_n.weights
+    end
+    
+    N_subjects = length(gdf)
+    μ_counts = vec(mean(COUNTS; dims=2))
+    sem_counts = vec(std(COUNTS; dims=2) ./ sqrt(N_subjects))
+
+    xs = zeros(length(edges) - 1)
+    step = 0
+    for i in eachindex(edges)[2:end]
+        xs[i-1] = step + (edges[i] - edges[i-1]) / 2
+        step += bin_size
+    end
+    
+    barplot!(ax, xs, μ_counts; gap=0, strokecolor=color, strokewidth=1, color=(color, 0.5))
+    errorbars!(ax, xs, μ_counts, sem_counts; color, whiskerwidth = 12)
+end
+
+function figure_RT(df; bin_size=0.5, save_fig=false, name="", title="")
+    colormap = ColorSchemes.seaborn_bright.colors
+    
+    edges = 0:bin_size:6
+
+    f = Figure(;size = (1024, 768), fontsize=30)
+    ax = Axis(
+        f[1, 1], 
+        title = title,
+        xlabel = "Response time [sec]",
+        ylabel = "Probability density function",
+        xticks = edges
+    )
+    
+    gdf = groupby(df, :subject_id)
+    plot_RT!(ax, gdf, edges; color=colormap[1], bin_size)
+
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
+function plot_RT_faces!(ax::Axis, df::Union{DataFrame, SubDataFrame}; color)
     RT = get_response_times(df)
     aggressiveness = df.score
     scores = sort(unique(aggressiveness))
@@ -204,18 +254,17 @@ function plot_RT!(ax::Axis, df::DataFrame; color)
         std(skipmissing(RT[idx])) / sqrt(count(.!ismissing.(RT[idx])))
     end
 
-    lines!(ax, scores, μ_RT_score; color)
-    scatter!(ax, scores, μ_RT_score; color)
-    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color)
+    barplot!(ax, scores, μ_RT_score; color=(color, 0.5))
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color, whiskerwidth = 12)
 end
 
-function plot_RT!(ax::Axis, gdf::GroupedDataFrame; colormap=ColorSchemes.seaborn_bright.colors)
+function plot_RT_faces!(ax::Axis, gdf::GroupedDataFrame; colormap=ColorSchemes.seaborn_bright.colors)
     for (i, df) in enumerate(gdf)
-        plot_RT!(ax, df; color = )
+        plot_RT_faces!(ax, df; color = colormap[mod(i, length(colormap))+1])
     end
 end
 
-function plot_RT!(ax, res::FacesResult, scores; colormap=ColorSchemes.seaborn_bright.colors)
+function plot_RT_faces!(ax, res::FacesResult, scores; colormap=ColorSchemes.seaborn_bright.colors)
     α, τ, z, drift_intercept, drift_slope = res.sol
     N_samples = 10_000
 
@@ -233,18 +282,17 @@ function plot_RT!(ax, res::FacesResult, scores; colormap=ColorSchemes.seaborn_br
         std(RT) / sqrt(N_samples)
     end
 
-    lines!(ax, scores, μ_RT_score; color=colormap[1])
-    scatter!(ax, scores, μ_RT_score; color=colormap[1])
-    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color=colormap[1])
+    barplot!(ax, scores, μ_RT_score; color=(color, 0.5))
+    errorbars!(ax, scores, μ_RT_score, sem_RT_score; color, whiskerwidth = 12)
 end
 
-function figure_RT_faces(df::DataFrame ; save_fig=false, name="")
+function figure_RT_faces(df::DataFrame ; save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
     ax = Axis(
         f[1, 1], 
-        title = "",
+        title = title,
         xlabel = "Aggressiveness",
         xticks = 0:10,
         ylabel = "Response Time [sec]"
@@ -252,16 +300,16 @@ function figure_RT_faces(df::DataFrame ; save_fig=false, name="")
 
     df_agr = read_aggressiveness(df; normalize=false)
     add_data!(df, df_agr)
-
-    plot_RT!(ax, df; colormap)
+    
+    plot_RT_faces!(ax, df; color=colormap[1])
  
-    image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./stimuli/face_angry.png")))
+    image!(ax, (0.5,1.5), (-0.3, -0.05), rotr90(load("./stimuli/face_angry.png")))
  
-    image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./stimuli/face_ambiguous.png")))
+    image!(ax, (4.5,5.5), (-0.3, -0.05), rotr90(load("./stimuli/face_ambiguous.png")))
 
-    image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./stimuli/face_neutral.png")))
+    image!(ax, (9.5,10.5), (-0.3, -0.05), rotr90(load("./stimuli/face_neutral.png")))
 
-    #ylims!.(ax, 0.6, 1.6)
+    ylims!.(ax, -0.3, 1.6)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
@@ -270,7 +318,7 @@ function figure_RT_faces(df::DataFrame ; save_fig=false, name="")
     f
 end
 
-function figure_faces_RT(df::DataFrame, res::FacesResult; save_fig=false)
+function figure_RT_faces(df::DataFrame, res::FacesResult; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     f = Figure(;size = (1024, 768), fontsize=30)
@@ -287,11 +335,11 @@ function figure_faces_RT(df::DataFrame, res::FacesResult; save_fig=false)
     scores = sort(unique(df.score))
     plot_RT_faces!(ax, res, scores; color=colormap[2], label = "Model")
  
-    #image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./figures/angry.png")))
+    image!(ax, (0.5,1.5), (0.7,0.85), rotr90(load("./stimuli/face_angry.png")))
+ 
+    image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./stimuli/face_ambiguous.png")))
 
-    #image!(ax, (4.5,5.5), (0.7,0.85), rotr90(load("./figures/ambiguous.png")))
-
-    #image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./figures/neutral.png")))
+    image!(ax, (9.5,10.5), (0.7,0.85), rotr90(load("./stimuli/face_neutral.png")))
 
     #ylims!.(ax, 0.6, 1.6)
 
@@ -304,7 +352,7 @@ function figure_faces_RT(df::DataFrame, res::FacesResult; save_fig=false)
     f
 end
 
-function plot_faces_psychophysics!(ax, df::DataFrame; color=:black, kwargs...)
+function plot_psychophysics_faces!(ax, df::DataFrame; color=:black)
     choices = get_choicesp1(df)
     aggressiveness = df.score
     scores = sort(unique(aggressiveness))
@@ -321,12 +369,12 @@ function plot_faces_psychophysics!(ax, df::DataFrame; color=:black, kwargs...)
         std(choices[idx] .== 2) / sqrt(N_trials_score)
     end
 
-    lines!(ax, scores, μ_acc_score; color, kwargs...)
+    lines!(ax, scores, μ_acc_score; color)
     scatter!(ax, scores, μ_acc_score; color)
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, kwargs...)
+function plot_psychophysics_faces!(ax, res::FacesResult, scores; color=:black)
     α, τ, z, drift_intercept, drift_slope = res.sol
     N_samples = 10_000
 
@@ -344,61 +392,45 @@ function plot_faces_psychophysics!(ax, res::FacesResult, scores; color=:black, k
         std(choices .== 2) / sqrt(N_samples)
     end
 
-    lines!(ax, scores, μ_acc_score; color, kwargs...)
+    lines!(ax, scores, μ_acc_score; color)
     scatter!(ax, scores, μ_acc_score; color)
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function figure_faces_psychophysics(df::DataFrame, session; save_fig=false)
+function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
-    
-    df_agr = read_aggressiveness(df; normalize=true)
-    add_data!(df, df_agr)
 
     f = Figure(;size = (1024, 768), fontsize=30)
     ax = Axis(
         f[1, 1], 
-        title = "",
+        title = title,
         xlabel = "Aggressiveness",
-        xticks = (-4.5:4.5, ["$(i)" for i in Base.OneTo(10)]),
+        xticks = Base.OneTo(10),
         yticks = 0:0.2:1,
         ylabel = "Probability of friend response"
     )
 
-    plot_acc_aggressiveness!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==1),:], 
-        aggressiveness; 
-        color=colormap[1],
-        label = "Control"
-    )
+    df_agr = read_aggressiveness(df; normalize=false)
+    add_data!(df, df_agr)
 
-    plot_acc_aggressiveness!(
-        ax, 
-        df[(df.session.==session) .& (df.run.==2),:], 
-        aggressiveness; 
-        color=colormap[2],
-        label = session.=="glc" ? "Glucose" : "BHB"
-    )
+    plot_psychophysics_faces!(ax, df; color=colormap[1])
  
-    image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./figures/angry.png")))
+    image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./stimuli/face_angry.png")))
  
-    image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./figures/ambiguous.png")))
+    image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./stimuli/face_ambiguous.png")))
 
-    image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./figures/neutral.png")))
+    image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./stimuli/face_neutral.png")))
 
     ylims!.(ax, -0.3, 1.0)
 
-    f[1, 2] = Legend(f, ax, framevisible = false)
-
     if save_fig
-        save(string("faces_psychophysics_ses_$(session)", ".png"), f, pt_per_unit=1)
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
 end
 
-function figure_faces_psychophysics(df::DataFrame, res::FacesResult; save_fig=false)
+function figure_psychophysics_faces(df::DataFrame, res::FacesResult; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
     
     df_agr = read_aggressiveness(df)
