@@ -57,7 +57,7 @@ function get_response_times(df)
     return r
 end
 
-function get_stimuli(df::DataFrame; σ_conv=1, grid_sz=(50,50))
+function get_stimuli(df; σ_conv=1, grid_sz=(50,50))
     X = mapreduce(hcat, eachrow(df)) do r
         set = parse(Int, r.set)
         cat = parse(Int, r.category)
@@ -74,7 +74,7 @@ function get_stimuli(df::DataFrame; σ_conv=1, grid_sz=(50,50))
     return X
 end
 
-function get_loglikelihood_dots(df::DataFrame)
+function get_loglikelihood_dots(df)
     map(eachrow(df)) do r
         set = parse(Int, r.set)
         cat = parse(Int, r.category)
@@ -85,14 +85,25 @@ function get_loglikelihood_dots(df::DataFrame)
     end
 end
 
-function get_response_dots(df::DataFrame; inter_dot_interval = 0.55)
+function get_loglikelihood_choice(df, choice_idx)
+    L = get_loglikelihood_dots(df)
+    RD = get_response_dots(df)
+
+    z = map(enumerate(L)) do (t, loglikelihoods)
+        sum(loglikelihoods[1:RD[t], choice_idx])
+    end
+
+    return z
+end
+
+function get_response_dots(df; inter_dot_interval = 0.55)
     RT = get_response_times(df)
     dots = div.(RT, inter_dot_interval, RoundDown)
 
     return Int.(dots)
 end
 
-get_image_IDs(df::DataFrame) = parse.(Int, df.image_response)
+get_image_IDs(df) = parse.(Int, df.image_response)
 
 load_image(pack, set, category, ID) = load("./stimuli/$(pack)/set_$(set)/cat_$(category)/ex_$(category)_$(ID).png")
 
