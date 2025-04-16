@@ -21,7 +21,9 @@ using LogExpFunctions: logsumexp, logistic
 using NNlib: softmax
 
 using Statistics: mean, std
-using StatsBase: ecdf
+using StatsBase: ecdf, Histogram, fit
+
+using LinearAlgebra: normalize
 
 using Base.Iterators: partition
 
