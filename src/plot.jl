@@ -767,7 +767,7 @@ function figure_psychophysics_CM(df::DataFrame; N_points=10, name="", save_fig=f
     f
 end
 
-function figure_regressor(t_regress, val_regress; pulse_width=1, name="", save_fig=false)
+function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
 
     val_padded = zeros(length(ts))
@@ -777,7 +777,7 @@ function figure_regressor(t_regress, val_regress; pulse_width=1, name="", save_f
     end
 
     f = Figure(;size = (1280, 720), fontsize=26)
-    ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = "Probability of left category")
+    ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = regressor_name)
 
     stairs!(ax, ts, val_padded)
 
