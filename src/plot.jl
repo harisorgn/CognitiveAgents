@@ -745,7 +745,7 @@ function plot_psychophysics_CM!(ax::Axis, gdf::GroupedDataFrame, edges; color)
     errorbars!(ax, edges[1:end-1], μ_P, sem_P; color) 
 end
 
-function figure_CM_psychophysics(df::DataFrame; N_points=10, name="", save_fig=false)
+function figure_psychophysics_CM(df::DataFrame; N_points=10, name="", save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
     z_left = get_loglikelihood_choice(df, 1)
