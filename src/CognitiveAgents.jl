@@ -29,6 +29,9 @@ using Base.Iterators: partition
 
 using Images: load, imresize, Gray
 
+using DSP
+using SpecialFunctions
+
 using UnPack
 using Serialization
 
@@ -47,7 +50,8 @@ export read_data_bipolar, read_aggressiveness, read_data_psychopy, read_data_js
 export get_choices, get_correct_categories, get_stimuli, get_response_times
 export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
 export objective, category_match, fit_CL, fit_CM, fit_CM, fit_faces, run_CL_task
-export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_group_accuracy, figure_regressor
-export results_to_regressors
+export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_group_accuracy
+export figure_regressor, figure_hrf_regressor
+export results_to_regressors, spm_hrf_convolve
 
 end 
