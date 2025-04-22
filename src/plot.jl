@@ -789,6 +789,23 @@ function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name=
 end
 
 
+function figure_hrf_regressor(t_regress, val_regress; regressor_name="", name="", save_fig=false)
+    ts = range(minimum(t_regress), maximum(t_regress); length = length(t_regress))
+    
+    v = spm_hrf_convolve(val_regress, 1)
+
+    f = Figure(;size = (1280, 720), fontsize=26)
+    ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = string(regressor_name, " (HRF)"))
+
+    lines!(ax, ts, v)
+
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
 function plot_prob_choice(L, β, σ; save=false)
     N_dots, N_categories = size(L)
 
