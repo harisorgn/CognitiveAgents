@@ -806,6 +806,36 @@ function figure_hrf_regressor(t_regress, val_regress; regressor_name="", name=""
     f
 end
 
+function figure_combined_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
+    colormap = ColorSchemes.seaborn_bright.colors
+
+    ts_hrf = range(minimum(t_regress), maximum(t_regress); length = length(t_regress))
+    val_hrf = spm_hrf_convolve(val_regress, 1)
+    val_hrf ./= maximum(val_hrf)
+
+    ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
+    val_padded = zeros(length(ts))
+    for (i, t) in enumerate(t_regress)
+        idx = argmin(abs.(ts .- t))
+        val_padded[idx] = val_regress[i]
+    end
+    val_padded ./= maximum(val_regress)
+
+    f = Figure(;size = (1280, 720), fontsize=26)
+    ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = regressor_name)
+
+    stairs!(ax, ts, val_padded; color=colormap[1], label="Raw")
+    lines!(ax, ts_hrf, val_hrf; color=colormap[2], label="HRF")
+
+    f[1, 2] = Legend(f, ax; framevisible = false)
+
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
+    end
+
+    f
+end
+
 function plot_prob_choice(L, β, σ; save=false)
     N_dots, N_categories = size(L)
 
