@@ -789,15 +789,23 @@ function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name=
 end
 
 
-function figure_hrf_regressor(t_regress, val_regress; regressor_name="", name="", save_fig=false)
-    ts = range(minimum(t_regress), maximum(t_regress); length = length(t_regress))
+function figure_hrf_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     
-    v = spm_hrf_convolve(val_regress, 1)
+    ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
+    val_padded = zeros(length(ts))
+    for (i, t) in enumerate(t_regress)
+        idx = argmin(abs.(ts .- t))
+        val_padded[idx] = val_regress[i]
+    end
+    val_padded ./= maximum(val_regress)
+
+    val_hrf = spm_hrf_convolve(val_padded, 1)
+    val_hrf ./= maximum(val_hrf)
 
     f = Figure(;size = (1280, 720), fontsize=26)
     ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = string(regressor_name, " (HRF)"))
 
-    lines!(ax, ts, v)
+    lines!(ax, ts, val_hrf)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
