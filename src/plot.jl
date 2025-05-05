@@ -809,10 +809,6 @@ end
 function figure_combined_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
-    ts_hrf = range(minimum(t_regress), maximum(t_regress); length = length(t_regress))
-    val_hrf = spm_hrf_convolve(val_regress, 1)
-    val_hrf ./= maximum(val_hrf)
-
     ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
     val_padded = zeros(length(ts))
     for (i, t) in enumerate(t_regress)
@@ -821,11 +817,14 @@ function figure_combined_regressor(t_regress, val_regress; pulse_width=1, regres
     end
     val_padded ./= maximum(val_regress)
 
+    val_hrf = spm_hrf_convolve(val_padded, 1)
+    val_hrf ./= maximum(val_hrf)
+
     f = Figure(;size = (1280, 720), fontsize=26)
     ax = Axis(f[1,1], xlabel = "Time [sec]", ylabel = regressor_name)
 
     stairs!(ax, ts, val_padded; color=colormap[1], label="Raw")
-    lines!(ax, ts_hrf, val_hrf; color=colormap[2], label="HRF")
+    lines!(ax, ts, val_hrf; color=colormap[2], label="HRF")
 
     f[1, 2] = Legend(f, ax; framevisible = false)
 
