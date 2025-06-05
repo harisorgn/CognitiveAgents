@@ -61,9 +61,9 @@ function fit_faces(df, alg; min_rt = 0.2, kwargs...)
 end
 
 
-function results_to_dataframe(results)
+function results_to_dataframe(results::Vector{<:FacesResult})
     df = DataFrame(
-        subject_ID = Int64[],
+        subject_id = Int64[],
         run = Int64[],
         session = String[],
         α = Float64[],
@@ -72,46 +72,32 @@ function results_to_dataframe(results)
         drift_intercept = Float64[],
         drift_slope = Float64[],
         drift_angry = Float64[],
-        drift_amb = Float64[],
         drift_neutral = Float64[]
     )
 
     for r in results
-        run = if r.run isa Number
-            r.run
-        else
-            if r.run .== "PRE"
-                1
-            elseif r.run .== "POST"
-                2
-            else
-                parse(Int, r.run)
-            end
-        end
+        α, τ, z, drift_intercept, drift_slope = r.sol
 
-        N_samples = length(r.chain)
+        drift_angry = drift_intercept - 4.5 * drift_slope
+        drift_neutral = drift_intercept + 4.5 * drift_slope
 
-        drift_angry = r.chain[:drift_intercept].data .+ 1 .* r.chain[:drift_slope].data
-        drift_neutral = r.chain[:drift_intercept].data .+ 10 .* r.chain[:drift_slope].data
-        drift_amb = r.chain[:drift_intercept].data .+ 5 .* r.chain[:drift_slope].data # 5 is the aggressiveness value for the most ambiguous faces
-        append!(
+        push!(
             df,
             (
-                subject_ID = fill(r.subject_ID, N_samples),
-                run = fill(run, N_samples),
-                session = fill(r.session, N_samples),
-                α = vec(r.chain[:α].data),
-                τ = vec(r.chain[:τ].data),
-                z = vec(r.chain[:z].data),
-                drift_intercept = vec(r.chain[:drift_intercept].data),
-                drift_slope = vec(r.chain[:drift_slope].data),
-                drift_amb = vec(drift_amb),
-                drift_angry = vec(drift_angry),
-                drift_neutral = vec(drift_neutral)
+                subject_id = only(r.subject_ID),
+                run = only(r.run),
+                session = only(r.session),
+                α = α,
+                τ = τ,
+                z = z,
+                drift_intercept = drift_intercept,
+                drift_slope = drift_slope,
+                drift_angry = drift_angry,
+                drift_neutral = drift_neutral
             ) 
         )
     end
-    sort!(df, :subject_ID)
+    sort!(df, :subject_id)
 
     return df
 end

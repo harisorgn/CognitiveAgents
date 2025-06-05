@@ -47,6 +47,7 @@ end
 function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
+    
     S = get_stimuli(df; grid_sz, σ_conv)
 
     lb = [0, 0]
@@ -179,14 +180,13 @@ function results_to_regressors(res::CLResult, df)
     CSV.write("CL_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end
 
-function results_to_dataframe(results::CLResult)
+function results_to_dataframe(results::Vector{<:CLResult})
     df = DataFrame(
-        subject_ID = Int64[],
+        subject_id = Int64[],
         run = Int64[],
         session = String[],
         η = Float64[],
-        ηₓ = Float64[],
-        α = Float64[]
+        β = Float64[]
     )
 
     for r in results
@@ -194,16 +194,15 @@ function results_to_dataframe(results::CLResult)
         push!(
             df,
             (
-                subject_ID = r.subject_ID,
-                run = r.run,
-                session = r.session,
+                subject_id = only(r.subject_ID),
+                run = only(r.run),
+                session = only(r.session),
                 η = r.sol[1],
-                ηₓ = r.sol[2],
-                α = r.sol[3]
+                β = r.sol[2]
             ) 
         )
     end
-    sort!(df, :subject_ID)
+    sort!(df, :subject_id)
 
     return df
 end

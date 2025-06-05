@@ -129,9 +129,9 @@ function results_to_regressors(res::CMResult, df; inter_dot_interval = 0.55)
     CSV.write("CM_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end
 
-function results_to_dataframe(results::CMResult)
+function results_to_dataframe(results::Vector{<:CMResult})
     df = DataFrame(
-        subject_ID = Int64[],
+        subject_id = Int64[],
         run = Int64[],
         session = String[],
         β = Float64[],
@@ -143,15 +143,15 @@ function results_to_dataframe(results::CMResult)
         push!(
             df,
             (
-                subject_ID = r.subject_ID,
-                run = r.run,
-                session = r.session,
+                subject_id = only(r.subject_ID),
+                run = only(r.run),
+                session = only(r.session),
                 β = r.sol[1],
                 σ_inf = r.sol[2]
             ) 
         )
     end
-    sort!(df, :subject_ID)
+    sort!(df, :subject_id)
 
     return df
 end
