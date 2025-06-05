@@ -32,6 +32,8 @@ using Images: load, imresize, Gray
 using DSP
 using SpecialFunctions
 
+using HypothesisTests: EqualVarianceTTest, pvalue
+
 using UnPack
 using Serialization
 
@@ -52,6 +54,8 @@ export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
 export objective, category_match, fit_CL, fit_CM, fit_CM, fit_faces, run_CL_task
 export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_group_accuracy
 export figure_regressor, figure_hrf_regressor, figure_combined_regressor
-export results_to_regressors, spm_hrf_convolve
+export figure_CL_model, figure_CM_model, figure_faces_model
+export figure_CL_model_param_diff, figure_CM_model_param_diff, figure_faces_model_param_diff
+export results_to_regressors, results_to_dataframe, spm_hrf_convolve
 
 end 
