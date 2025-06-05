@@ -24,21 +24,39 @@ files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 
 df = read_data_bipolar(files, cols)
-filter!(r -> (r.subject_id <= 99) .& (r.run == 1) .& (r.phase == "test"), df)
 
-
-run = 1
-session = "bhb"
 IDs = unique(df.subject_id)
 alg = Optim.IPNewton()
-for ID in [104]
+
+run = 2
+session = "glc"
+for ID in IDs
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-    res = fit_CM(df_fit, alg)
-    
-    serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).csv", res)
-
-    results_to_regressors(res, df)
+    if !isempty(df_fit)
+        res = fit_CM(df_fit, alg)
+        serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
 end
 
-#figure_CM_psychophysics(df_fit, res; N_points=10, save_fig=true)
+session = "bhb"
+for ID in IDs
+    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
+
+    if !isempty(df_fit)
+        res = fit_CM(df_fit, alg)
+        serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
+end
+
+dir = joinpath("./results", "category_match")
+files = readdir(dir; join=true)
+res = deserialize.(files)
+df = results_to_dataframe(res)
+
+figure_CM_model(df)
+
+figure_CM_model_param_diff(df)
+
+
+

@@ -24,9 +24,6 @@ files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 
 df = read_data_bipolar(files, cols)
-filter!(r -> (r.subject_id <= 99) .& (r.run == 1) .& (r.phase == "test"), df)
-
-
 
 IDs = unique(df.subject_id)
 
@@ -34,17 +31,36 @@ IDs = unique(df.subject_id)
 grid_sz = (50,50)
 alg = Optim.IPNewton()
 
-run = 1
+run = 2
 session = "glc"
 for ID in IDs
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-    res = fit_CL(df_fit, alg; grid_sz, σ_conv)
-    
-    serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).csv", res)
+    if !isempty(df_fit)
+        res = fit_CL(df_fit, alg; grid_sz, σ_conv)
+        
+        serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
+end
 
-    results_to_regressors(res, df)
+session = "bhb"
+for ID in IDs
+    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
+
+    if !isempty(df_fit)
+        res = fit_CL(df_fit, alg; grid_sz, σ_conv)
+        
+        serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
 end
 
 
-#figure_subject_accuracy(df_fit, res; N_trials_average=4, save_fig=false)
+dir = joinpath("./results", "category_learn")
+files = readdir(dir; join=true)
+res = deserialize.(files)
+df = results_to_dataframe(res)
+
+figure_CL_model(df)
+
+figure_CL_model_param_diff(df)
+

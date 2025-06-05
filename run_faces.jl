@@ -18,24 +18,36 @@ files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 
 df = read_data_bipolar(files, cols)
-filter!(r -> (r.subject_id <= 99) .& (r.run == 1), df)
 
-IDs = unique(df.subject_id)
-
-run = 1
-session = "glc"
 IDs = unique(df.subject_id)
 alg = Optim.IPNewton()
+
+run = 2
+session = "bhb"
 for ID in IDs
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-    res = fit_faces(df_fit, alg)
-    
-    serialize("faces_model_sub-$(ID)_ses-$(session)_run-$(run).csv", res)
-
-    results_to_regressors(res, df)
+    if !isempty(df_fit)
+        res = fit_faces(df_fit, alg)
+        serialize("faces_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
 end
 
-#figure_faces_psychophysics(df_fit, res; save_fig=true)
+session = "glc"
+for ID in IDs
+    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-#figure_faces_RT(df_fit, res; save_fig=true)
+    if !isempty(df_fit)
+        res = fit_faces(df_fit, alg)
+        serialize("faces_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+    end
+end
+
+dir = joinpath("./results", "faces_match")
+files = readdir(dir; join=true)
+res = deserialize.(files)
+df = results_to_dataframe(res)
+
+figure_faces_model(df)
+
+figure_faces_model_param_diff(df)
