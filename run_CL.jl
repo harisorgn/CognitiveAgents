@@ -2,6 +2,7 @@ using CognitiveAgents
 using Serialization
 using OptimizationOptimJL
 using DataFramesMeta
+using Turing
 
 cols = [
     :subject_id,
@@ -29,38 +30,25 @@ IDs = unique(df.subject_id)
 
 σ_conv = 5
 grid_sz = (50,50)
-alg = Optim.IPNewton()
 
-run = 2
-session = "glc"
-for ID in IDs
-    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
+choices = Vector{Int}[]
+corrects = Vector{Int}[]
+group_index = Int[]
 
-    if !isempty(df_fit)
-        res = fit_CL(df_fit, alg; grid_sz, σ_conv)
-        
-        serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+for session in ["glc", "bhb"]
+    for ID in IDs
+        df_fit = @subset(df, :subject_id .== ID, :run .== 1, :session .== session)
+        if !isempty(df_fit)
+            push!(choices, get_choices(df_fit))
+            push!(corrects, get_correct_categories(df_fit))
+            #push!(S, get_stimuli(df_fit; grid_sz, σ_conv))
+            push!(group_index, ID <= 99 ? 1 : 2)
+        end
     end
 end
-
-session = "bhb"
-for ID in IDs
-    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
-
-    if !isempty(df_fit)
-        res = fit_CL(df_fit, alg; grid_sz, σ_conv)
-        
-        serialize("CL_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
-    end
-end
+S = deserialize("stimuli.jls")
 
 
-dir = joinpath("./results", "category_learn")
-files = readdir(dir; join=true)
-res = deserialize.(files)
-df = results_to_dataframe(res)
-
-figure_CL_model(df)
-
-figure_CL_model_param_diff(df)
+model = hierarchical_SLP(choices, group_index, S, corrects)
+chain = sample(model, NUTS(2000, 0.85), 4_000, progress=false)
 

@@ -19,6 +19,80 @@ function prediction_error(correct_cat, predicted_cat, η)
     return η * (correct_cat - predicted_cat)
 end
 
+@model function SLP(choices, S::AbstractMatrix, corrects::AbstractVector, ::Type{T}=Float64) where {T} # Single Layer Perceptron
+
+    D, N_trials = size(S)
+
+    if choices === missing
+        choices = Vector{T}(undef, N_trials)
+    end
+
+    η ~ Beta(2,2)
+    β ~ Gamma(2,2)
+    
+    weights = zeros(typeof(η), D)
+
+    for t in Base.OneTo(N_trials)
+        stimulus = S[:,t]
+        correct_cat = corrects[t]
+
+        P_right = probability_right_category(stimulus, weights, β)
+
+        choices[t] ~ Bernoulli(P_right)
+
+        weights .+= stimulus .* prediction_error(correct_cat, P_right, η) 
+    end
+
+    return choices
+end
+
+@model function hierarchical_SLP(choices, group_index, S, corrects)
+
+    α_η ~ filldist(Gamma(2, 2), 2)
+    β_η ~ filldist(Gamma(5, 2), 2)
+    η ~ arraydist([Beta(1 + α_η[i], 1 + β_η[i]) for i in group_index])
+
+    α_β ~ filldist(Gamma(5, 1), 2)
+    μ_β ~ filldist(truncated(Normal(4.5, 2), 0, Inf), 2)
+    θ_β = (1 .+ α_β) ./ μ_β
+    β ~ arraydist([Gamma(1 + α_β[i], θ_β[i]) for i in group_index])
+
+    for i in group_index
+        S_subject = @views S[i]
+        corrects_subject = @views corrects[i]
+        choices_subject = @views choices[i]
+
+        η_subject = η[i]
+        β_subject = β[i]
+
+        D, N_trials = size(S_subject)
+        weights = zeros(typeof(η_subject), D)
+        for t in Base.OneTo(N_trials)
+            stimulus = S_subject[:,t]
+            correct_cat = corrects_subject[t]
+
+            P_right = probability_right_category(stimulus, weights, β_subject)
+
+            #choices_subject[t] ~ Bernoulli(P_right)
+            Turing.@addlogprob! loglikelihood(Bernoulli(P_right), choices_subject[t])
+            
+            weights .+= stimulus .* prediction_error(correct_cat, P_right, η_subject) 
+        end
+    end
+end
+
+function fit_CL_bayes(df; σ_conv=5, grid_sz=(50,50), kwargs...)
+    choices = get_choices(df)
+    corrects = get_correct_categories(df)
+    S = get_stimuli(df; grid_sz, σ_conv)
+
+    model = SLP(S, choices, corrects)
+    chain = sample(model, NUTS(), 2_000, progress=false);
+
+    return chain
+end
+
+
 function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
     #agent = initialise_agent(S, p) 
     #return -loglikelihood(agent, S, choices, corrects)
