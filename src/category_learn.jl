@@ -52,19 +52,21 @@ end
     β_η ~ filldist(Gamma(5, 2), 2)
     η ~ arraydist([Beta(1 + α_η[i], 1 + β_η[i]) for i in group_index])
 
+    #=
     α_β ~ filldist(Gamma(5, 1), 2)
     μ_β ~ filldist(truncated(Normal(4.5, 2), 0, Inf), 2)
     θ_β = (1 .+ α_β) ./ μ_β
     β ~ arraydist([Gamma(1 + α_β[i], θ_β[i]) for i in group_index])
-
+    =#
     for i in group_index
         S_subject = @views S[i]
         corrects_subject = @views corrects[i]
         choices_subject = @views choices[i]
 
         η_subject = η[i]
-        β_subject = β[i]
-
+        #β_subject = β[i]
+        β_subject = 1.0
+        
         D, N_trials = size(S_subject)
         weights = zeros(typeof(η_subject), D)
         for t in Base.OneTo(N_trials)
@@ -75,7 +77,7 @@ end
 
             #choices_subject[t] ~ Bernoulli(P_right)
             Turing.@addlogprob! loglikelihood(Bernoulli(P_right), choices_subject[t])
-            
+
             weights .+= stimulus .* prediction_error(correct_cat, P_right, η_subject) 
         end
     end
