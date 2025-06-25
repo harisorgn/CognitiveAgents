@@ -3,6 +3,9 @@ using Serialization
 using OptimizationOptimJL
 using DataFramesMeta
 using Turing
+using ForwardDiff, Preferences
+
+set_preferences!(ForwardDiff, "nansafe_mode" => true)
 
 cols = [
     :subject_id,
@@ -48,7 +51,14 @@ for session in ["glc", "bhb"]
 end
 S = deserialize("stimuli.jls")
 
+setprogress!(false)
 
 model = hierarchical_SLP(choices, group_index, S, corrects)
-chain = sample(model, NUTS(2000, 0.85), 4_000, progress=false)
 
+chain = sample(
+            model, 
+            NUTS(0.85), 
+            MCMCThreads(),
+            2_000, 
+            4
+)
