@@ -1,11 +1,7 @@
 using CognitiveAgents
 using Serialization
-using OptimizationOptimJL
+using OptimizationNLopt
 using DataFramesMeta
-using Turing
-using ForwardDiff, Preferences
-
-set_preferences!(ForwardDiff, "nansafe_mode" => true)
 
 cols = [
     :subject_id,
@@ -34,31 +30,16 @@ IDs = unique(df.subject_id)
 σ_conv = 5
 grid_sz = (50,50)
 
-choices = Vector{Int}[]
-corrects = Vector{Int}[]
-group_index = Int[]
+df_fit = @subset(df, :subject_id .== IDs[1], :run .== 1, :session .== "glc")
+S = get_stimuli(df_fit; σ_conv, grid_sz)
+choices = get_choices(df_fit)
+corrects = get_correct_categories(df_fit)
 
-for session in ["glc", "bhb"]
-    for ID in IDs
-        df_fit = @subset(df, :subject_id .== ID, :run .== 1, :session .== session)
-        if !isempty(df_fit)
-            push!(choices, get_choices(df_fit))
-            push!(corrects, get_correct_categories(df_fit))
-            #push!(S, get_stimuli(df_fit; grid_sz, σ_conv))
-            push!(group_index, ID <= 99 ? 1 : 2)
-        end
-    end
-end
-S = deserialize("stimuli.jls")
+ag = initialise_agent(S, [0.1, 0.1])
 
-setprogress!(false)
+loglikelihood(ag, S, choices, corrects)
 
-model = hierarchical_SLP(choices, group_index, S, corrects)
 
-chain = sample(
-            model, 
-            NUTS(0.85), 
-            MCMCThreads(),
-            2_000, 
-            4
-)
+alg = NLopt.LN_BOBYQA()
+
+r = fit_EM(df_fit, alg)

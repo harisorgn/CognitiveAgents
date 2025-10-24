@@ -95,6 +95,10 @@ function local_MAP!(agent::EMAgent, x)
     agent.S̄[:, zₜ] .+= agent.ηₓ * (log.(x) - agent.S̄[:, zₜ])
 end
 
+function loglikelihood_category(P_right_cat, cat)
+    return cat * log(P_right_cat + eps()) + (1 - cat) * log(1 - P_right_cat + eps())
+end
+
 function E_step!(agent::EMAgent, stim, correct_category, t)
     @unpack W, S̄, N, z, logq, α, β, ηₓ = agent
 
@@ -200,7 +204,7 @@ end
 
 function logprior(k, z, t; β=1)
     t_past = Base.OneTo(t-1)
-  
+    
     return log(sum(kernel.(Ref(t), t_past[z .== k]; β)))
 end
 
@@ -284,7 +288,7 @@ function run_task!(agent, env)
     return choices
 end
 
-initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=1, β=1, σ²=2)
+initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=2)
 
 struct GridSearch
     step_size::Float64
@@ -303,30 +307,17 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     corrects = get_correct_categories(df)
     S = get_stimuli(df; grid_sz, σ_conv)
 
-    lb = [0, 0]
-    ub = [1.0, Inf]
-    
-    if alg isa GridSearch
-        step_sz = alg.step_size
-        r1 = lb[1]:step_sz:ub[1]
-        r2 = lb[2]:step_sz:ub[2]
-        OBJ = zeros(length(r1), length(r2))
-        for (i, p1) in enumerate(r1)
-            for (j, p2) in enumerate(r2)
-                OBJ[i, j] = obj([p1, p2], nothing)
-            end
-        end
+    p0 = [0.1, 0.1, 1, 1]
+    ag = initialise_agent(S, p0)
 
-        sol = OBJ
-    else
-        obj = OptimizationFunction(
-            (p, hyperp) -> objective(S, choices, corrects, p), 
-            Optimization.AutoForwardDiff()
-        )
-        p0 = [0.1, 1]
-        prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
-        sol = solve(prob, alg; kwargs...)
-    end
+    lb = [0, 0, 0, 0]
+    ub = [1.0, 1.0, 100, 100]
+    
+    obj = OptimizationFunction(
+        (p, hyperp) -> loglikelihood(ag, S, choices, corrects)
+    )
+    prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
+    sol = solve(prob, alg; kwargs...)
 
     id = unique(df.subject_id)
     session = unique(df.session)

@@ -46,6 +46,7 @@ include("CategoryLearnEnv.jl")
 include("category_learn.jl")
 include("category_match.jl")
 include("faces_match.jl")
+include("EM_agent.jl")
 include("plot.jl")
 
 export read_data_bipolar, read_aggressiveness, read_data_psychopy, read_data_js
@@ -58,5 +59,6 @@ export figure_CL_model, figure_CM_model, figure_faces_model
 export figure_CL_model_param_diff, figure_CM_model_param_diff, figure_faces_model_param_diff
 export results_to_regressors, results_to_dataframe, spm_hrf_convolve
 export fit_CL_bayes, SLP, hierarchical_SLP
+export loglikelihood, run_trial!, run_task!, fit_EM, initialise_agent
 
 end 

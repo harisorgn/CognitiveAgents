@@ -106,7 +106,7 @@ function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set,
     df = combine(
         gdf, 
         :correct => mean => :accuracy, 
-        :correct => (c -> std(c) ./ N_subjects) => :sem_accuracy,
+        :correct => (c -> std(c) ./ sqrt(N_subjects)) => :sem_accuracy,
         :set => only ∘ unique => :set
     )
     
@@ -115,8 +115,8 @@ function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set,
         acc = df[df.set .== s, :accuracy]
         sem_acc = df[df.set .== s, :sem_accuracy]
 
-        scatter!(ax, xs, acc; color = colormap[1])
-        lines!(ax, xs, acc; label, color = colormap[1])
+        scatter!(ax, xs, acc; color = colormap[1], markersize=20)
+        lines!(ax, xs, acc; label, color = colormap[1], linewidth=10)
         band!(ax, xs, acc .- sem_acc, acc .+ sem_acc; color = (colormap[2], 0.3))
 
         xs .+= N_points
@@ -131,7 +131,7 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
     N_points_per_set = N_trials_per_set
     xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
     
-    f = Figure(;size = (1024, 768), fontsize=26)
+    f = Figure(;size = (1024, 768), fontsize=32)
     ax = Axis(
         f[1, 1], 
         title = title,
@@ -144,8 +144,8 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
     gdf = groupby(df, :trial_index)
     plot_group_accuracy!(ax, gdf, N_trials_per_set, N_subjects; colormap)
 
-    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
-    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
+    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 4, color=:gray)
+    hlines!(ax, [0.5], linestyle = :dash, linewidth = 4, color=:grey)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
