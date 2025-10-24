@@ -482,7 +482,7 @@ function plot_param_diff!(ax, df, param, sessions; colormap = ColorSchemes.seabo
     end
 end
 
-function figure_CL_model(df; save=false)
+function figure_CL_model(df; save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
     f = Figure(;size = (1280, 720), fontsize=30)
@@ -492,7 +492,7 @@ function figure_CL_model(df; save=false)
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Feedback sensitivity",
+                ylabel = "Learning rate",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             ),
@@ -501,7 +501,7 @@ function figure_CL_model(df; save=false)
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Exploration/Exploitation",
+                ylabel = "Reward sensitivity",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             )
@@ -521,7 +521,7 @@ function figure_CL_model(df; save=false)
     supertitle = f[0, :] = Label(f, "Dot Category Learn model parameters",
         fontsize = 30, color = (:black, 0.6))
 
-    if save
+    if save_fig
         save(string("task1_model_params", ".png"), f, pt_per_unit=1)
     end
 
