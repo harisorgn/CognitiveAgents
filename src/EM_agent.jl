@@ -248,6 +248,12 @@ function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVecto
     return L_data
 end
 
+function loglikelihood(params::AbstractVector, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
+    ag = initialise_agent(S, params)
+
+    return loglikelihood(ag, S, choices, corrects; N_loops)
+end
+
 function act(agent::EMAgent, stimulus)
     z_stim_t = argmax(agent.logq_stim)
     P = probability_right_category(stimulus, agent.W[:, z_stim_t])
@@ -288,7 +294,7 @@ function run_task!(agent, env)
     return choices
 end
 
-initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=2)
+initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5])
 
 struct GridSearch
     step_size::Float64
@@ -297,24 +303,14 @@ end
 function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
-    S = stimuli(df; grid_sz, σ_conv)
-
-    return fit_EM(S, choices, corrects, alg; σ_conv, grid_sz, kwargs...)
-end
-
-function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
-    choices = get_choices(df)
-    corrects = get_correct_categories(df)
     S = get_stimuli(df; grid_sz, σ_conv)
 
-    p0 = [0.1, 0.1, 1, 1]
-    ag = initialise_agent(S, p0)
-
-    lb = [0, 0, 0, 0]
-    ub = [1.0, 1.0, 100, 100]
+    p0 = [0.1, 0.1, 1, 1, 2]
+    lb = [0, 0, 0, 0, 0]
+    ub = [1.0, 1.0, 100, 100, 100]
     
     obj = OptimizationFunction(
-        (p, hyperp) -> loglikelihood(ag, S, choices, corrects)
+        (p, hyperp) -> loglikelihood(p, S, choices, corrects)
     )
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
