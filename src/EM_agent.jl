@@ -92,7 +92,9 @@ function local_MAP!(agent::EMAgent, x)
     end
 
     agent.N[zₜ] += 1
-    agent.S̄[:, zₜ] .+= agent.ηₓ * (log.(x) - agent.S̄[:, zₜ])
+
+    #agent.S̄[:, zₜ] .+= agent.ηₓ * (log.(x) - agent.S̄[:, zₜ])
+    agent.S̄[:, zₜ] .+= agent.ηₓ * (x - agent.S̄[:, zₜ])
 end
 
 function loglikelihood_category(P_right_cat, cat)
@@ -188,16 +190,19 @@ function M_step!(agent::EMAgent, stim, correct_cat)
 end
 
 function loglikelihood_stimulus(stim, S̄, N; σ²=1)
-    μ₀ = -2
-    σ₀² = 1
+    #μ₀ = -2
+    #σ₀² = 1
 
+    μ₀ = 0.2
+    σ₀² = 0.04
+    
     ŝ = (S̄ * N * σ₀² .+ μ₀ * σ²) / (N*σ₀² + σ²)
     ν² = σ² + (σ² * σ₀²) / (N*σ₀² + σ²)
 
     Nₛ = length(stim)
     
-    loglhood = - Nₛ*log(2*pi*ν²)/2 - sum(log.(stim)) - sum((log.(stim) .- ŝ).^2 / (2*ν²))
-    #loglhood = - Nₛ*log(2*pi*ν²)/2 - sum((stim .- ŝ).^2 / (2*ν²))
+    #loglhood = - Nₛ*log(2*pi*ν²)/2 - sum(log.(stim)) - sum((log.(stim) .- ŝ).^2 / (2*ν²))
+    loglhood = - Nₛ*log(2*pi*ν²)/2 - sum((stim .- ŝ).^2 / (2*ν²))
 
     return loglhood
 end
