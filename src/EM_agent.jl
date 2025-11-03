@@ -141,7 +141,6 @@ function E_step_stimulus!(agent::EMAgent, stim, t)
         logpriors[k] = k == K ? log(α) : logprior(k, z, t; β)
         loglhood_stim = loglikelihood_stimulus(stim, S̄[:,k], N[k]; σ²=agent.σ²)
         agent.loglhood_stim[k] = loglhood_stim
-
         agent.logq_stim[k] = loglhood_stim
     end
     
@@ -299,7 +298,8 @@ function run_task!(agent, env)
     return choices
 end
 
-initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5])
+#initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5])
+initialise_agent(X, p) = EMAgent(X; η=0.1, ηₓ=0.1, α=p[1], β=p[2], σ²=2)
 
 struct GridSearch
     step_size::Float64
@@ -310,9 +310,9 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     corrects = get_correct_categories(df)
     S = get_stimuli(df; grid_sz, σ_conv)
 
-    p0 = [0.1, 0.1, 1, 1, 2]
-    lb = [0, 0, 0, 0, 0]
-    ub = [1.0, 1.0, 100, 100, 100]
+    p0 = [1, 1]
+    lb = [0, 0]
+    ub = [10, 10]
     
     obj = OptimizationFunction(
         (p, hyperp) -> loglikelihood(p, S, choices, corrects)

@@ -35,6 +35,8 @@ S = get_stimuli(df_fit; σ_conv, grid_sz)
 choices = get_choices(df_fit)
 corrects = get_correct_categories(df_fit)
 
-alg = NLopt.GN_MLSL_LDS()
+alg = NLopt.GN_MLSL()
 
-r = fit_EM(df_fit, alg; local_method=NLopt.LN_SBPLX(), maxtime=1e4)
+r = fit_EM(df_fit, alg; local_method=NLopt.LN_BOBYQA(), maxtime=1e4)
+
+ 
