@@ -1,4 +1,4 @@
 Manifest.toml
 /data
 *.png
-*.jls
+/*.jls
