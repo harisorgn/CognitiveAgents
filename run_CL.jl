@@ -30,13 +30,15 @@ IDs = unique(df.subject_id)
 σ_conv = 5
 grid_sz = (50,50)
 
-df_fit = @subset(df, :subject_id .== IDs[1], :run .== 1, :session .== "glc")
-S = get_stimuli(df_fit; σ_conv, grid_sz)
-choices = get_choices(df_fit)
-corrects = get_correct_categories(df_fit)
+for run in [1, 2]
+    for session in ["glc", "bhb"]
+        for ID in IDs
+            df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
-alg = NLopt.GN_MLSL()
-
-r = fit_EM(df_fit, alg; local_method=NLopt.LN_BOBYQA(), maxtime=1e4)
-
- 
+            if !isempty(df_fit)
+                res = fit_EM(df_fit, NLopt.LN_BOBYQA(); reltol=1e-8, abstol=1e-8)
+                serialize("CL_EM_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+            end
+        end
+    end
+end
