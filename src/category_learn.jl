@@ -256,6 +256,7 @@ function results_to_regressors(res::CLResult, df)
     CSV.write("CL_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end
 
+#=
 function results_to_dataframe(results::Vector{<:CLResult})
     df = DataFrame(
         subject_id = Int64[],
@@ -282,4 +283,4 @@ function results_to_dataframe(results::Vector{<:CLResult})
 
     return df
 end
-
+=#

@@ -324,7 +324,6 @@ function fit_EM(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     return res
 end
 
-
 function results_to_regressors(res::CLResult, df)
     df_regress = DataFrame(
         t_loglikelihood = Float64[],
@@ -384,4 +383,36 @@ function results_to_regressors(res::CLResult, df)
     end
 
     CSV.write("CL_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
+end
+
+function results_to_dataframe(results::Vector{<:CLResult})
+    df = DataFrame(
+        subject_id = Int64[],
+        run = Int64[],
+        session = String[],
+        η = Float64[], 
+        ηₓ = Float64[], 
+        α = Float64[], 
+        β = Float64[], 
+        σ² = Float64[]
+    )
+
+    for r in results
+        push!(
+            df,
+            (
+                subject_id = only(r.subject_ID),
+                run = only(r.run),
+                session = only(r.session),
+                η = r.sol[1], 
+                ηₓ = r.sol[2], 
+                α = r.sol[3], 
+                β = r.sol[4], 
+                σ² = r.sol[5]
+            ) 
+        )
+    end
+    sort!(df, :subject_id)
+
+    return df
 end
