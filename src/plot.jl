@@ -352,7 +352,7 @@ function figure_RT_faces(df::DataFrame, res::FacesResult; save_fig=false)
     f
 end
 
-function plot_psychophysics_faces!(ax, df::DataFrame; color=:black)
+function plot_psychophysics_faces!(ax, df::DataFrame; color=:black, kwargs...)
     choices = get_choicesp1(df)
     aggressiveness = df.score
     scores = sort(unique(aggressiveness))
@@ -369,12 +369,12 @@ function plot_psychophysics_faces!(ax, df::DataFrame; color=:black)
         std(choices[idx] .== 2) / sqrt(N_trials_score)
     end
 
-    lines!(ax, scores, μ_acc_score; color)
+    lines!(ax, scores, μ_acc_score; color, kwargs...)
     scatter!(ax, scores, μ_acc_score; color)
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
-function plot_psychophysics_faces!(ax, res::FacesResult, scores; color=:black)
+function plot_psychophysics_faces!(ax, res::FacesResult, scores; color=:black, kwargs...)
     α, τ, z, drift_intercept, drift_slope = res.sol
     N_samples = 10_000
 
@@ -392,7 +392,7 @@ function plot_psychophysics_faces!(ax, res::FacesResult, scores; color=:black)
         std(choices .== 2) / sqrt(N_samples)
     end
 
-    lines!(ax, scores, μ_acc_score; color)
+    lines!(ax, scores, μ_acc_score; color, kwargs...)
     scatter!(ax, scores, μ_acc_score; color)
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
@@ -413,8 +413,20 @@ function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", titl
     df_agr = read_aggressiveness(df; normalize=false)
     add_data!(df, df_agr)
 
-    plot_psychophysics_faces!(ax, df; color=colormap[1])
- 
+    df_ctrl_base = @subset(df, :subject_id .<= 99, :run .== 1)
+    df_ctrl_glc = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "glc")
+    df_ctrl_bhb = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "bhb")
+    df_bp_base = @subset(df, :subject_id .> 99, :run .== 1)
+    df_bp_glc = @subset(df, :subject_id .> 99, :run .== 2, :session .== "glc")
+    df_bp_bhb = @subset(df, :subject_id .> 99, :run .== 2, :session .== "bhb")
+    
+    !isempty(df_ctrl_base) && plot_psychophysics_faces!(ax, df_ctrl_base; color=colormap[1], label="Control Baseline")
+    !isempty(df_ctrl_glc) && plot_psychophysics_faces!(ax, df_ctrl_glc; color=colormap[2], label="Control GLC")
+    !isempty(df_ctrl_bhb) && plot_psychophysics_faces!(ax, df_ctrl_bhb; color=colormap[3], label="Control BHB")
+    !isempty(df_bp_base) && plot_psychophysics_faces!(ax, df_bp_base; color=colormap[4], label="Bipolar Baseline")
+    !isempty(df_bp_glc) && plot_psychophysics_faces!(ax, df_bp_glc; color=colormap[5], label="Bipolar GLC")
+    !isempty(df_bp_bhb) && plot_psychophysics_faces!(ax, df_bp_bhb; color=colormap[6], label="Bipolar BHB")
+
     image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./stimuli/face_angry.png")))
  
     image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./stimuli/face_ambiguous.png")))
@@ -422,6 +434,8 @@ function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", titl
     image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./stimuli/face_neutral.png")))
 
     ylims!.(ax, -0.3, 1.0)
+
+    f[1, 2] = Legend(f, ax, framevisible = false)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
