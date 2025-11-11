@@ -46,7 +46,6 @@ include("CategoryLearnEnv.jl")
 include("category_learn.jl")
 include("category_match.jl")
 include("faces_match.jl")
-include("EM_agent.jl")
 include("plot.jl")
 
 export read_data_bipolar, read_aggressiveness, read_data_psychopy, read_data_js
