@@ -1,6 +1,3 @@
-kernel(t1, t2; β=1) = β / (t1 - t2)
-
-
 function gauss_mask(N, σ)
     P = zeros((N^2, N^2))
     c = 1
