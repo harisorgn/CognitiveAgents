@@ -496,7 +496,17 @@ function plot_param_diff!(ax, df, param, sessions; colormap = ColorSchemes.seabo
     end
 end
 
-function figure_CL_model(df; save_fig=false)
+function plot_param!(ax, x, v; kwargs...)
+    N = length(v)
+    μ = mean(v)
+    sem = std(v) / sqrt(N)
+
+    scatter!(ax, fill(x, N), v; kwargs...)
+    scatter!(ax, [x], [μ]; color=:black)
+    errorbars!(ax, [x], [μ], sem; color=:black) 
+end
+
+function figure_CL_model(df; save_fig=false, name="")
     colormap = ColorSchemes.seaborn_bright.colors
 
     f = Figure(;size = (1280, 720), fontsize=30)
@@ -515,28 +525,67 @@ function figure_CL_model(df; save_fig=false)
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Reward sensitivity",
+                ylabel = "Prototype learning rate",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[1, 3], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Inverse stickiness",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 1], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Rule decay rate",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 2], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Prototype variance",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             )
     ]
 
-    df_control = @subset(df, :subject_id .<= 99, :run .== 1)
-    df_bipolar = @subset(df, :subject_id .> 99, :run .== 1)
+    df_control = @subset(df, :subject_id .<= 99)
+    df_bipolar = @subset(df, :subject_id .> 99)
 
-    scatter!(ax[1], fill(1, nrow(df_control)), df_control.η; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar)), df_bipolar.η; color=colormap[2])
+    #scatter!(ax[1], fill(1, nrow(df_control)), df_control.η; color=(colormap[1], 0.2))
+    #scatter!(ax[1], fill(2, nrow(df_bipolar)), df_bipolar.η; color=(colormap[2], 0.2))
 
-    scatter!(ax[2], fill(1, nrow(df_control)), df_control.β; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar)), df_bipolar.β; color=colormap[2])
+    plot_param!(ax[1], 1, df_control.η; color=(colormap[1], 0.1))
+    plot_param!(ax[1], 2, df_bipolar.η; color=(colormap[2], 0.1))
 
-     xlims!.(ax, 0.8, 2.2)
+    plot_param!(ax[2], 1, df_control.ηₓ; color=(colormap[1], 0.1))
+    plot_param!(ax[2], 2, df_bipolar.ηₓ; color=(colormap[2], 0.1))
+
+    plot_param!(ax[3], 1, df_control.α; color=(colormap[1], 0.1))
+    plot_param!(ax[3], 2, df_bipolar.α; color=(colormap[2], 0.1))
+
+    plot_param!(ax[4], 1, df_control.β; color=(colormap[1], 0.1))
+    plot_param!(ax[4], 2, df_bipolar.β; color=(colormap[2], 0.1))
+
+    plot_param!(ax[5], 1, df_control.σ²; color=(colormap[1], 0.1))
+    plot_param!(ax[5], 2, df_bipolar.σ²; color=(colormap[2], 0.1))
+
+    xlims!.(ax, 0.8, 2.2)
 
     supertitle = f[0, :] = Label(f, "Dot Category Learn model parameters",
         fontsize = 30, color = (:black, 0.6))
 
     if save_fig
-        save(string("task1_model_params", ".png"), f, pt_per_unit=1)
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
@@ -552,7 +601,7 @@ function figure_CL_model_param_diff(df; save=false)
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Feedback sensitivity",
+                ylabel = "Learning rate",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             ),

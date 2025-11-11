@@ -36,8 +36,8 @@ for run in [1, 2]
             df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
             if !isempty(df_fit)
-                res = fit_EM(df_fit, NLopt.LN_BOBYQA(); reltol=1e-8, abstol=1e-8)
-                serialize("CL_EM_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+                res = fit_CL(df_fit, NLopt.LN_BOBYQA(); reltol=1e-8, abstol=1e-8)
+                serialize("CL_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
             end
         end
     end

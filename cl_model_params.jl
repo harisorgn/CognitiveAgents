@@ -11,6 +11,18 @@ fs = readdir("./results/category_learn/"; join=true)
 res = deserialize.(fs)
 df = results_to_dataframe(res)
 
+
+df_baseline = @subset(df, :run .== 1)
+figure_CL_model(df_baseline; save_fig=true, name="cl_params_baseline")
+
+df_glc = @subset(df, :run .== 2, :session .== "glc")
+figure_CL_model(df_glc; save_fig=true, name="cl_params_glc")
+
+df_bhb = @subset(df, :run .== 2, :session .== "bhb")
+figure_CL_model(df_bhb; save_fig=true, name="cl_params_bhb")
+
+
+
 X = transpose(Matrix(df[!, [:η, :ηₓ, :α, :β, :σ²]]))
 
 idxs_ctrl_base = (df.subject_id .<= 99) .& (df.run .== 1)
