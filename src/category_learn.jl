@@ -14,8 +14,9 @@ mutable struct EMAgent
     const η::Float64
     const ηₓ::Float64
     const σ²::Float64
+    const d::Float64
 
-    function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=0.1)
+    function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=0.1, d=1.0)
         D, N_trials = size(X)
         logq = zeros(1)
         logq_stim = zeros(1)
@@ -27,7 +28,7 @@ mutable struct EMAgent
         S̄ = [zeros(D, 2)]
         loglikelihood_data = zeros(N_trials)
 
-        new(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ²)
+        new(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ², d)
     end
 end
 
@@ -94,10 +95,10 @@ end
 
 kernel(t1, t2; d=1) = d / (t1 - t2)
 
-function logprior(k, z, t)
+function logprior(k, z, t; d=1)
     t_past = Base.OneTo(t-1)
     
-    return log(sum(kernel.((t,), t_past[z .== k]; d=1)))
+    return log(sum(kernel.((t,), t_past[z .== k]; d)))
 end
 
 function update_latent_factor!(zs, logq)
@@ -131,7 +132,7 @@ function local_MAP!(agent::EMAgent, x, correct_cat)
 end
 
 function E_step!(agent::EMAgent, stim, correct_category, t)
-    @unpack W, S̄, N, z, logq, α, β, σ² = agent
+    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
 
     K = length(logq)
 
@@ -139,7 +140,7 @@ function E_step!(agent::EMAgent, stim, correct_category, t)
     loglhood_category = zeros(K)
 
     for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
         S̄_k = @views S̄[k]
         loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
         agent.loglhood_stim[k] = loglhood_stim
@@ -161,14 +162,14 @@ function E_step!(agent::EMAgent, stim, correct_category, t)
 end
 
 function E_step_stimulus!(agent::EMAgent, stim, t)
-    @unpack W, S̄, N, z, logq, α, β, σ² = agent
+    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
 
     K = length(logq)
 
     logpriors = similar(logq)
 
     for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
         S̄_k = @views S̄[k]
         loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
         agent.loglhood_stim[k] = loglhood_stim
@@ -182,7 +183,7 @@ function E_step_stimulus!(agent::EMAgent, stim, t)
 end
 
 function E_step_category!(agent::EMAgent, stim, correct_category, t)
-    @unpack W, S̄, N, z, logq, α, β, σ² = agent
+    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
 
     K = length(logq)
 
@@ -190,7 +191,7 @@ function E_step_category!(agent::EMAgent, stim, correct_category, t)
     loglhood_category = zeros(K)
 
     for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
         S̄_k = @views S̄[k]
         loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
         agent.loglhood_stim[k] = loglhood_stim
@@ -235,7 +236,7 @@ function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
     return L_data
 end
 
-function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
+function loglikelihood!(agent::EMAgent, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
     D, N_trials = size(S)
 
     L_data = 0
@@ -260,14 +261,13 @@ function loglikelihood(agent::EMAgent, S::AbstractMatrix, choices::AbstractVecto
     return L_data
 end
 
+initialise_agent(X; η=0.1, ηₓ=0.1, α=1.0, β=1.0, σ²=0.1, d=1.0) = EMAgent(X; η, ηₓ, α, β, σ², d)
+
 function negative_loglikelihood(params::AbstractVector, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
-    ag = initialise_agent(S, params)
+    ag = initialise_agent(S; η=params[1], ηₓ=params[2], α=params[3], β=params[4], σ²=params[5], d=params[6])
 
-    return -loglikelihood(ag, S, choices, corrects; N_loops)
+    return -loglikelihood!(ag, S, choices, corrects; N_loops)
 end
-
-initialise_agent(X, p) = EMAgent(X; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5])
-#initialise_agent(X, p) = EMAgent(X; η=0.1, ηₓ=0.1, α=p[1], β=p[2], σ²=0.1)
 
 struct GridSearch
     step_size::Float64
@@ -278,9 +278,9 @@ function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     corrects = get_correct_categories(df)
     S = get_stimuli(df; grid_sz, σ_conv)
 
-    p0 = [0.1, 0.1, 1.0, 1.0, 0.1]
-    lb = [0.0, 0.0, 0.0, 0.0, 0.0]
-    ub = [1.0, 1.0, 100.0, 100.0, 100.0]
+    p0 = [0.1, 0.1, 1.0, 1.0, 0.1, 1.0]
+    lb = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    ub = [1.0, 1.0, 100.0, 100.0, 100.0, 100.0]
     
     obj = OptimizationFunction(
         (p, hyperp) -> negative_loglikelihood(p, S, choices, corrects)
@@ -367,7 +367,8 @@ function results_to_dataframe(results::Vector{<:CLResult})
         ηₓ = Float64[], 
         α = Float64[], 
         β = Float64[], 
-        σ² = Float64[]
+        σ² = Float64[],
+        d = Float64[]
     )
 
     for r in results
@@ -381,7 +382,8 @@ function results_to_dataframe(results::Vector{<:CLResult})
                 ηₓ = r.sol[2], 
                 α = r.sol[3], 
                 β = r.sol[4], 
-                σ² = r.sol[5]
+                σ² = r.sol[5],
+                d = r.sol[6]
             ) 
         )
     end
@@ -389,6 +391,23 @@ function results_to_dataframe(results::Vector{<:CLResult})
 
     return df
 end
+
+function get_categorization_rules(df_data::DataFrame, df_params::DataFrame, ID, session, run; σ_conv=5, grid_sz=(50,50))
+    df_data_subj = @subset(df_data, :subject_id.==ID, :run.==run, :session.==session)
+    df_params_subj = @subset(df_params, :subject_id.==ID, :run.==run, :session.==session)
+
+    choices = get_choices(df_data_subj)
+    corrects = get_correct_categories(df_data_subj)
+    S = get_stimuli(df_data_subj; σ_conv, grid_sz)
+
+    @assert nrow(df_params_subj)==1
+    p = Vector(df_params_subj[1, [:η, :ηₓ, :α, :β, :σ², :d]])
+    ag = initialise_agent(S; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5], d=p[6])
+    loglikelihood!(ag, S, choices, corrects)
+
+    return ag.z
+end
+
 
 function act(agent::EMAgent, stimulus)
     z_stim_t = argmax(agent.logq_stim)
