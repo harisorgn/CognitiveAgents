@@ -6,6 +6,7 @@ using DataFramesMeta
 using UMAP
 using CairoMakie
 using ColorSchemes
+using CSV
 
 task = "task1"
 dir = joinpath("./data", "bipolar")
