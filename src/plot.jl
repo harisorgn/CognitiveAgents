@@ -509,7 +509,7 @@ end
 function figure_CL_model(df; save_fig=false, name="")
     colormap = ColorSchemes.seaborn_bright.colors
 
-    f = Figure(;size = (1280, 720), fontsize=30)
+    f = Figure(;size = (1280, 720), fontsize=22)
     ax = [
             Axis(
                 f[1, 1], 
@@ -543,7 +543,7 @@ function figure_CL_model(df; save_fig=false, name="")
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Rule decay rate",
+                ylabel = "Inverse temperature",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             ),
@@ -555,30 +555,51 @@ function figure_CL_model(df; save_fig=false, name="")
                 ylabel = "Prototype variance",
                 xticklabelsize = 26,
                 yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 3], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Memory decay rate",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[3, 1], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Categorization rules",
+                xticklabelsize = 26,
+                yticklabelsize = 26
             )
     ]
 
     df_control = @subset(df, :subject_id .<= 99)
     df_bipolar = @subset(df, :subject_id .> 99)
 
-    #scatter!(ax[1], fill(1, nrow(df_control)), df_control.η; color=(colormap[1], 0.2))
-    #scatter!(ax[1], fill(2, nrow(df_bipolar)), df_bipolar.η; color=(colormap[2], 0.2))
+    plot_param!(ax[1], 1, df_control.η; color=(colormap[1], 0.25))
+    plot_param!(ax[1], 2, df_bipolar.η; color=(colormap[2], 0.25))
 
-    plot_param!(ax[1], 1, df_control.η; color=(colormap[1], 0.1))
-    plot_param!(ax[1], 2, df_bipolar.η; color=(colormap[2], 0.1))
+    plot_param!(ax[2], 1, df_control.ηₓ; color=(colormap[1], 0.25))
+    plot_param!(ax[2], 2, df_bipolar.ηₓ; color=(colormap[2], 0.25))
 
-    plot_param!(ax[2], 1, df_control.ηₓ; color=(colormap[1], 0.1))
-    plot_param!(ax[2], 2, df_bipolar.ηₓ; color=(colormap[2], 0.1))
+    plot_param!(ax[3], 1, df_control.α; color=(colormap[1], 0.25))
+    plot_param!(ax[3], 2, df_bipolar.α; color=(colormap[2], 0.25))
 
-    plot_param!(ax[3], 1, df_control.α; color=(colormap[1], 0.1))
-    plot_param!(ax[3], 2, df_bipolar.α; color=(colormap[2], 0.1))
+    plot_param!(ax[4], 1, df_control.β; color=(colormap[1], 0.25))
+    plot_param!(ax[4], 2, df_bipolar.β; color=(colormap[2], 0.25))
 
-    plot_param!(ax[4], 1, df_control.β; color=(colormap[1], 0.1))
-    plot_param!(ax[4], 2, df_bipolar.β; color=(colormap[2], 0.1))
+    plot_param!(ax[5], 1, df_control.σ²; color=(colormap[1], 0.25))
+    plot_param!(ax[5], 2, df_bipolar.σ²; color=(colormap[2], 0.25))
 
-    plot_param!(ax[5], 1, df_control.σ²; color=(colormap[1], 0.1))
-    plot_param!(ax[5], 2, df_bipolar.σ²; color=(colormap[2], 0.1))
+    plot_param!(ax[6], 1, df_control.d; color=(colormap[1], 0.25))
+    plot_param!(ax[6], 2, df_bipolar.d; color=(colormap[2], 0.25))
 
+    plot_param!(ax[7], 1, df_control.N_rules; color=(colormap[1], 0.25))
+    plot_param!(ax[7], 2, df_bipolar.N_rules; color=(colormap[2], 0.25))
+    
     xlims!.(ax, 0.8, 2.2)
 
     supertitle = f[0, :] = Label(f, "Dot Category Learn model parameters",
@@ -591,10 +612,10 @@ function figure_CL_model(df; save_fig=false, name="")
     f
 end
 
-function figure_CL_model_param_diff(df; save=false)
+function figure_CL_model_param_diff(df; save_fig=false, name="")
     colormap = ColorSchemes.seaborn_bright.colors
 
-    f = Figure(;size = (1280, 720), fontsize=30)
+    f = Figure(;size = (1280, 720), fontsize=22)
     ax = [
             Axis(
                 f[1, 1], 
@@ -610,30 +631,90 @@ function figure_CL_model_param_diff(df; save=false)
                 title = "",
                 xlabel = "",
                 xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Exploration/Exploitation",
+                ylabel = "Prototype learning rate",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[1, 3], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Inverse stickiness",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 1], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Inverse temperature",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 2], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Prototype variance",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[2, 3], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Memory decay rate",
+                xticklabelsize = 26,
+                yticklabelsize = 26
+            ),
+            Axis(
+                f[3, 1], 
+                title = "",
+                xlabel = "",
+                xticks = ([1,2], ["Control", "Bipolar"]),
+                ylabel = "Categorization rules",
                 xticklabelsize = 26,
                 yticklabelsize = 26
             )
     ]
 
-    df_control_pre = @subset(df, :subject_id .<= 99, :run .== 1, :session .== "bhb")
-    df_control_post = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "bhb")
-    df_bipolar_pre = @subset(df, :subject_id .> 99, :run .== 1, :session .== "bhb")
-    df_bipolar_post = @subset(df, :subject_id .> 99, :run .== 2, :session .== "bhb")
+    df_control_base = @subset(df, :subject_id.<=99, :run.==1)
+    df_bipolar_base = @subset(df, :subject_id.>99, :run.==1)
+    df_control_drug = @subset(df, :subject_id.<=99, :run.==2)
+    df_bipolar_drug = @subset(df, :subject_id.>99, :run.==2)
 
-    scatter!(ax[1], fill(1, nrow(df_control_pre)), df_control_post.η .- df_control_pre.η; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.η .- df_bipolar_pre.η; color=colormap[2])
+    plot_param!(ax[1], 1, df_control_drug.η .- df_control_base.η; color=(colormap[1], 0.25))
+    plot_param!(ax[1], 2, df_bipolar_drug.η .- df_bipolar_base.η; color=(colormap[2], 0.25))
 
-    scatter!(ax[2], fill(1, nrow(df_control_pre)), df_control_post.β .- df_control_pre.β; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.β .- df_bipolar_pre.β; color=colormap[2])
+    plot_param!(ax[2], 1, df_control_drug.ηₓ .- df_control_base.ηₓ; color=(colormap[1], 0.25))
+    plot_param!(ax[2], 2, df_bipolar_drug.ηₓ .- df_bipolar_base.ηₓ; color=(colormap[2], 0.25))
 
+    plot_param!(ax[3], 1, df_control_drug.α .- df_control_base.α; color=(colormap[1], 0.25))
+    plot_param!(ax[3], 2, df_bipolar_drug.α .- df_bipolar_base.α; color=(colormap[2], 0.25))
+
+    plot_param!(ax[4], 1, df_control_drug.β .- df_control_base.β; color=(colormap[1], 0.25))
+    plot_param!(ax[4], 2, df_bipolar_drug.β .- df_bipolar_base.β; color=(colormap[2], 0.25))
+
+    plot_param!(ax[5], 1, df_control_drug.σ² .- df_control_base.σ²; color=(colormap[1], 0.25))
+    plot_param!(ax[5], 2, df_bipolar_drug.σ² .- df_bipolar_base.σ²; color=(colormap[2], 0.25))
+    
+    plot_param!(ax[6], 1, df_control_drug.d .- df_control_base.d; color=(colormap[1], 0.25))
+    plot_param!(ax[6], 2, df_bipolar_drug.d .- df_bipolar_base.d; color=(colormap[2], 0.25))
+    
+    plot_param!(ax[7], 1, df_control_drug.N_rules .- df_control_base.N_rules; color=(colormap[1], 0.25))
+    plot_param!(ax[7], 2, df_bipolar_drug.N_rules .- df_bipolar_base.N_rules; color=(colormap[2], 0.25))
+    
     xlims!.(ax, 0.8, 2.2)
 
     supertitle = f[0, :] = Label(f, "Dot Category Learn model parameter differences",
         fontsize = 30, color = (:black, 0.6))
 
-    if save
-        save(string("task1_model_param_diff", ".png"), f, pt_per_unit=1)
+    if save_fig
+        save(string(name, ".png"), f, pt_per_unit=1)
     end
 
     f
