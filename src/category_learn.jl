@@ -1,34 +1,34 @@
-mutable struct EMAgent
-    W::Matrix{Float64}
-    S̄::Vector{Matrix{Float64}}
-    N::Vector{Int}
-    logq::Vector{Float64}
-    logq_stim::Vector{Float64} # log P(z|stim) posterior without category info
-    loglhood_stim::Vector{Float64}
+mutable struct EMAgent{T}
+    W::Matrix{T}
+    S̄::Vector{Matrix{T}}
+    N::Vector{T}
+    logq::Vector{T}
+    logq_stim::Vector{T} # log P(z|stim) posterior without category info
+    loglhood_stim::Vector{T}
     z::Vector{Int}
     z_stim::Vector{Int}
     const N_loops::Int
-    const L_data::Vector{Float64}
-    const α::Float64
-    const β::Float64
-    const η::Float64
-    const ηₓ::Float64
-    const σ²::Float64
-    const d::Float64
+    const L_data::Vector{T}
+    const α::T
+    const β::T
+    const η::T
+    const ηₓ::T
+    const σ²::T
+    const d::T
 
     function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=0.1, d=1.0)
         D, N_trials = size(X)
-        logq = zeros(1)
-        logq_stim = zeros(1)
-        loglhood_stim = zeros(1)
-        N = [0]
+        logq = zeros(typeof(α), 1)
+        logq_stim = zeros(typeof(α), 1)
+        loglhood_stim = zeros(typeof(α), 1)
+        N = zeros(typeof(α), 1)
         z = Int[]
         z_stim = Int[]
-        W = zeros(D, 1)
-        S̄ = [zeros(D, 2)]
-        loglikelihood_data = zeros(N_trials)
-
-        new(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ², d)
+        W = zeros(typeof(α), D, 1)
+        S̄ = [zeros(typeof(α), D, 2)]
+        loglikelihood_data = zeros(typeof(α), N_trials)
+        
+        new{typeof(α)}(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ², d)
     end
 end
 
@@ -115,16 +115,16 @@ function local_MAP!(agent::EMAgent, x, correct_cat)
     zₜ = last(agent.z)
 
     if zₜ >= K
-        push!(agent.N, 0)
-        push!(agent.logq, 0)
-        push!(agent.logq_stim, 0)
-        push!(agent.loglhood_stim, 0)
+        push!(agent.N, 0.0)
+        push!(agent.logq, 0.0)
+        push!(agent.logq_stim, 0.0)
+        push!(agent.loglhood_stim, 0.0)
 
-        agent.W = hcat(agent.W, zeros(D))
-        push!(agent.S̄, zeros(D, 2))
+        agent.W = hcat(agent.W, zeros(eltype(agent.W), D))
+        push!(agent.S̄, zeros(eltype(first(agent.S̄)), D, 2))
     end
 
-    agent.N[zₜ] += 1
+    agent.N[zₜ] += 1.0
 
     S̄_correct_cat = @views agent.S̄[zₜ][:, correct_cat + 1]
     #S̄_correct_cat .+= agent.ηₓ * (log.(x) - S̄_correct_cat)
@@ -188,7 +188,7 @@ function E_step_category!(agent::EMAgent, stim, correct_category, t)
     K = length(logq)
 
     logpriors = similar(logq)
-    loglhood_category = zeros(K)
+    loglhood_category = zeros(eltype(logpriors), K)
 
     for k in Base.OneTo(K)
         logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
@@ -264,7 +264,7 @@ end
 initialise_agent(X; η=0.1, ηₓ=0.1, α=1.0, β=1.0, σ²=0.1, d=1.0) = EMAgent(X; η, ηₓ, α, β, σ², d)
 
 function negative_loglikelihood(params::AbstractVector, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
-    ag = initialise_agent(S; η=params[1], ηₓ=params[2], α=params[3], β=params[4], σ²=params[5], d=params[6])
+    ag = initialise_agent(S; η=params[1], ηₓ=params[2], α=params[3], β=params[4], σ²=params[5])
 
     return -loglikelihood!(ag, S, choices, corrects; N_loops)
 end
@@ -278,16 +278,29 @@ function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     corrects = get_correct_categories(df)
     S = get_stimuli(df; grid_sz, σ_conv)
 
-    p0 = [0.1, 0.1, 1.0, 1.0, 0.1, 1.0]
-    lb = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    ub = [1.0, 1.0, 100.0, 100.0, 100.0, 100.0]
+    p0 = [0.1, 0.1, 1.0, 1.0, 0.1]
+    lb = [0.0, 0.0, 0.0, 0.0, 0.0]
+    ub = [1.0, 1.0, 10.0, 10.0, 10.0]
     
     obj = OptimizationFunction(
-        (p, hyperp) -> negative_loglikelihood(p, S, choices, corrects)
+        (p, hyperp) -> negative_loglikelihood(p, S, choices, corrects),
+        Optimization.AutoForwardDiff()
     )
+   
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
-
+    
+    #=
+    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.INFO))
+    @variable(model, 0 <= η <= 1)
+    @variable(model, 0 <= ηₓ <= 1)
+    @variable(model, α >= 0)
+    @variable(model, β >= 0)
+    @variable(model, σ² >= 0)
+    @variable(model, d >= 0)
+    @objective(model, Min, negative_loglikelihood([η, ηₓ, α, β, σ², d], S, choices, corrects))
+    optimize!(model)
+    =#
     id = unique(df.subject_id)
     session = unique(df.session)
     run = unique(df.run)
