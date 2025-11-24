@@ -310,6 +310,16 @@ function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
     return res
 end
 
+@model function category_learn(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector)
+    α ~ LogNormal(1.5,1)
+    β ~ InverseGamma(2,5)
+    η ~ Beta(2,4)
+    ηₓ ~ Beta(2,4)
+    σ² ~ InverseGamma(1,0.5)
+
+    Turing.@addlogprob! - negative_loglikelihood([η, ηₓ, α, β, σ²], S, choices, corrects)
+end
+
 function results_to_regressors(res::CLResult, df)
     df_regress = DataFrame(
         t_loglikelihood = Float64[],
