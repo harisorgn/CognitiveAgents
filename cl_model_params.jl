@@ -12,6 +12,19 @@ task = "task1"
 dir = joinpath("./data", "bipolar")
 files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
+cols = [
+    :subject_id,
+    :stimulus_ID,
+    :category,
+    :set,
+    :response,
+    :correct,
+    :correct_response,
+    :response_time,
+    :stim_presentation_time,
+    :phase,
+    :version
+]
 df_data = read_data_bipolar(files, cols)
 
 df_params = CSV.read("./results/category_learn/CL_model_params.csv", DataFrame)
@@ -47,7 +60,7 @@ figure_CL_model_param_diff(df_bhb; save_fig=true, name="cl_params_diff_bhb")
 
 
 
-X = transpose(Matrix(df_params[!, [:η, :ηₓ, :α, :β, :σ²]]))
+X = transpose(Matrix(df_params[!, [:η, :ηₓ, :α, :β, :σ², :d]]))
 
 idxs_ctrl_base = (df_params.subject_id .<= 99) .& (df_params.run .== 1)
 idxs_bp_base = (df_params.subject_id .> 99) .& (df_params.run .== 1)
