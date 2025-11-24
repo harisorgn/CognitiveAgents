@@ -9,6 +9,8 @@ using Turing
 
 using Optimization
 using Optim
+using JuMP
+using MadNLP
 
 using DelimitedFiles: readdlm
 using CSV
@@ -59,5 +61,6 @@ export figure_CL_model_param_diff, figure_CM_model_param_diff, figure_faces_mode
 export results_to_regressors, results_to_dataframe, spm_hrf_convolve
 export fit_CL_bayes, SLP, hierarchical_SLP
 export loglikelihood, run_trial!, run_task!, initialise_agent, get_categorization_rules
+export category_learn
 
 end 
