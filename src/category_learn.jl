@@ -1,34 +1,42 @@
-mutable struct EMAgent{T}
+abstract type AbstractRegressor end
+
+mutable struct EMAgent{T, R <: AbstractRegressor}
     W::Matrix{T}
     S̄::Vector{Matrix{T}}
     N::Vector{T}
-    logq::Vector{T}
-    logq_stim::Vector{T} # log P(z|stim) posterior without category info
+    logpost::Vector{T}
+    logpost_stim::Vector{T} # log P(z|stim) posterior without category info
     loglhood_stim::Vector{T}
+    loglhood_category::Vector{T}
+    logprior::Vector{T}
+    RPE::Vector{T}
     z::Vector{Int}
     z_stim::Vector{Int}
     const N_loops::Int
-    const L_data::Vector{T}
     const α::T
     const β::T
     const η::T
     const ηₓ::T
     const σ²::T
-    const d::T
+    const s::T
+    const regressor::R
 
-    function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=0.1, d=1.0)
+    function EMAgent(X; N_loops=1, α=0.2, η=0.2, β=1, ηₓ=0.1, σ²=0.1, s=1.0)
         D, N_trials = size(X)
-        logq = zeros(typeof(α), 1)
-        logq_stim = zeros(typeof(α), 1)
-        loglhood_stim = zeros(typeof(α), 1)
-        N = zeros(typeof(α), 1)
+        logpost = zeros(typeof(s), 1)
+        logpost_stim = zeros(typeof(s), 1)
+        loglhood_stim = zeros(typeof(s), 1)
+        loglhood_category = zeros(typeof(s), 1)
+        logprior = zeros(typeof(s), 1)
+        RPE = zeros(typeof(s), 1)
+        N = zeros(typeof(s), 1)
         z = Int[]
         z_stim = Int[]
-        W = zeros(typeof(α), D, 1)
-        S̄ = [zeros(typeof(α), D, 2)]
-        loglikelihood_data = zeros(typeof(α), N_trials)
-        
-        new{typeof(α)}(W, S̄, N, logq, logq_stim, loglhood_stim, z, z_stim, N_loops, loglikelihood_data, α, β, η, ηₓ, σ², d)
+        W = zeros(typeof(s), D, 1)
+        S̄ = [zeros(typeof(s), D, 2)]
+        regressor = EMRegressor(N_trials)
+
+        new{typeof(η), typeof(regressor)}(W, S̄, N, logpost, logpost_stim, loglhood_stim, loglhood_category, logprior, RPE, z, z_stim, N_loops, α, β, η, ηₓ, σ², s, regressor)
     end
 end
 
@@ -41,29 +49,38 @@ struct CLResult
     run
 end
 
-struct TrialMetrics
-    W::Vector{Matrix{Float64}}
-    logq::Vector{Vector{Float64}}
-    loglhood::Vector{Vector{Float64}}
+struct EMRegressor <: AbstractRegressor
+    RPE::Vector{Float64}
+    loglikelihood_stimulus::Vector{Float64}
+    loglikelihood_category::Vector{Float64}
+    logposterior_stim::Vector{Float64}
+    logposterior::Vector{Float64}
 
-    function TrialMetrics(N_trials)
+    function EMRegressor(N_trials::Int)
         new(
-            Vector{Matrix{Float64}}(undef, N_trials), 
-            Vector{Vector{Float64}}(undef, N_trials), 
-            Vector{Vector{Float64}}(undef, N_trials)
+            Vector{Float64}(undef, N_trials),
+            Vector{Float64}(undef, N_trials), 
+            Vector{Float64}(undef, N_trials), 
+            Vector{Float64}(undef, N_trials),
+            Vector{Float64}(undef, N_trials)
         )
     end
 end
 
-struct EmptyMetrics end
+function add_regressors!(r::EMRegressor, agent::EMAgent, t)
+    z = last(agent.z)
+    z_stim = last(agent.z_stim)
 
-function store_trial_metrics!!(tm::TrialMetrics, t, agent)
-    tm.W[t] = copy(agent.W)
-    tm.logq[t] = copy(agent.logq)
-    tm.loglhood[t] =  copy(agent.loglhood_stim)
+    r.RPE[t] = agent.RPE[z_stim]
+    r.loglikelihood_stimulus[t] = agent.loglhood_stim[z_stim]
+    r.loglikelihood_category[t] = agent.loglhood_category[z]
+    r.logposterior_stim[t] = agent.logpost_stim[z_stim]
+    r.logposterior[t] = agent.logpost[z_stim]
 end
 
-function store_trial_metrics!!(tm::EmptyMetrics, t, agent) end
+struct NoRegressor <: AbstractRegressor end
+
+function add_regressors!(::NoRegressor, ::EMAgent, t) end
 
 probability_right_category(stim, w; β=1) = logistic(β * w' * stim)
 
@@ -72,11 +89,11 @@ function loglikelihood_category(P_right_cat, cat)
 end
 
 function loglikelihood_stimulus(stim, S̄, N; σ²=0.1)
-    #μ₀ = -2
-    #σ₀² = 1
+    μ₀ = -3
+    σ₀² = 1
 
-    μ₀ = 0.1
-    σ₀² = 0.04
+    #μ₀ = 0.1
+    #σ₀² = 0.04
     
     D, N_cats = size(S̄)
 
@@ -85,40 +102,42 @@ function loglikelihood_stimulus(stim, S̄, N; σ²=0.1)
         Ŝ = (S̄_c * N * σ₀² .+ μ₀ * σ²) / (N*σ₀² + σ²)
         #ν² = σ² + (σ² * σ₀²) / (N*σ₀² + σ²)
         ν² = (σ² * σ₀²) / (N*σ₀² + σ²)
-        
-        #- D*log(2*pi*ν²)/2 - sum(log.(stim)) - sum((log.(stim) .- ŝ).^2 / (2*ν²))
-        - D*log(2*pi*ν²)/2 - sum((stim .- Ŝ).^2 / (2*ν²))
-    end 
 
+        mean([-log(sqrt(ν²))-log(2*pi)/2-((stim[p] - Ŝ[p]).^2)/(2*ν²) for p in Base.OneTo(D)])
+    end 
+    
     return logsumexp(loglhood_cats)
 end
 
-kernel(t1, t2; d=1) = d / (t1 - t2)
+kernel(t1, t2; L=1) = L / (t1 - t2)
 
-function logprior(k, z, t; d=1)
+function logprior(k, z, t; s=0)
     t_past = Base.OneTo(t-1)
     
-    return log(sum(kernel.((t,), t_past[z .== k]; d)))
+    return log(sum(kernel.((t,), t_past[z .== k]))) + s
 end
 
-function update_latent_factor!(zs, logq)
-    zₜ = argmax(logq)
+function update_latent_factor!(zs, logpost)
+    zₜ = argmax(logpost)
     push!(zs, zₜ)
 end
 
 function local_MAP!(agent::EMAgent, x, correct_cat)    
     
-    update_latent_factor!(agent.z, agent.logq)
-    update_latent_factor!(agent.z_stim, agent.logq_stim)
+    update_latent_factor!(agent.z, agent.logpost)
+    update_latent_factor!(agent.z_stim, agent.logpost_stim)
 
     D, K = size(agent.W)
     zₜ = last(agent.z)
 
     if zₜ >= K
-        push!(agent.N, 0.0)
-        push!(agent.logq, 0.0)
-        push!(agent.logq_stim, 0.0)
-        push!(agent.loglhood_stim, 0.0)
+        push!(agent.N, zero(eltype(agent.N)))
+        push!(agent.logpost, zero(eltype(agent.logpost)))
+        push!(agent.logpost_stim, zero(eltype(agent.logpost_stim)))
+        push!(agent.loglhood_stim, zero(eltype(agent.loglhood_stim)))
+        push!(agent.loglhood_category, zero(eltype(agent.loglhood_category)))
+        push!(agent.logprior, zero(eltype(agent.logprior)))
+        push!(agent.RPE, zero(eltype(agent.RPE)))
 
         agent.W = hcat(agent.W, zeros(eltype(agent.W), D))
         push!(agent.S̄, zeros(eltype(first(agent.S̄)), D, 2))
@@ -127,111 +146,70 @@ function local_MAP!(agent::EMAgent, x, correct_cat)
     agent.N[zₜ] += 1.0
 
     S̄_correct_cat = @views agent.S̄[zₜ][:, correct_cat + 1]
-    #S̄_correct_cat .+= agent.ηₓ * (log.(x) - S̄_correct_cat)
     S̄_correct_cat .+= agent.ηₓ * (x - S̄_correct_cat)
 end
 
-function E_step!(agent::EMAgent, stim, correct_category, t)
-    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
-
-    K = length(logq)
-
-    logpriors = similar(logq)
-    loglhood_category = zeros(K)
-
-    for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
-        S̄_k = @views S̄[k]
-        loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
-        agent.loglhood_stim[k] = loglhood_stim
-
-        P = probability_right_category(stim, W[:,k]; β)
-        loglhood_category[k] = loglikelihood_category(P, correct_category) 
-
-        agent.logq[k] = loglhood_stim + loglhood_category[k]
-        agent.logq_stim[k] = loglhood_stim
-    end
-    
-    logpriors .-= logsumexp(logpriors)   
-
-    agent.logq .+= logpriors 
-    agent.logq .-= logsumexp(logq)
-
-    agent.logq_stim .+= logpriors
-    agent.logq_stim .-= logsumexp(agent.logq_stim)
-end
-
 function E_step_stimulus!(agent::EMAgent, stim, t)
-    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
+    @unpack W, S̄, N, z, logpost, α, β, σ², s = agent
 
-    K = length(logq)
-
-    logpriors = similar(logq)
+    K = length(logpost)
 
     for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
+        agent.logprior[k] = k == K ? log(α) : logprior(k, z, t; s)
         S̄_k = @views S̄[k]
         loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
         agent.loglhood_stim[k] = loglhood_stim
-        agent.logq_stim[k] = loglhood_stim
+        agent.logpost_stim[k] = loglhood_stim
     end
     
-    logpriors .-= logsumexp(logpriors)   
+    agent.logprior .-= logsumexp(agent.logprior)
 
-    agent.logq_stim .+= logpriors
-    agent.logq_stim .-= logsumexp(agent.logq_stim)
+    agent.logpost_stim .+= agent.logprior
+    agent.logpost_stim .-= logsumexp(agent.logpost_stim)
 end
 
 function E_step_category!(agent::EMAgent, stim, correct_category, t)
-    @unpack W, S̄, N, z, logq, α, β, σ², d = agent
+    @unpack W, S̄, N, z, logpost, α, β, σ², s = agent
 
-    K = length(logq)
-
-    logpriors = similar(logq)
-    loglhood_category = zeros(eltype(logpriors), K)
+    K = length(logpost)
 
     for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t; d)
-        S̄_k = @views S̄[k]
-        loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
-        agent.loglhood_stim[k] = loglhood_stim
-
         P = probability_right_category(stim, W[:,k]; β)
-        loglhood_category[k] = loglikelihood_category(P, correct_category) 
+        agent.loglhood_category[k] = loglikelihood_category(P, correct_category) 
 
-        agent.logq[k] = loglhood_stim + loglhood_category[k]
+        agent.logpost[k] = agent.loglhood_stim[k] + agent.loglhood_category[k]
     end
     
-    logpriors .-= logsumexp(logpriors)   
-
-    agent.logq .+= logpriors 
-    agent.logq .-= logsumexp(logq)
+    agent.logpost .+= agent.logprior
+    agent.logpost .-= logsumexp(logpost)
 end
 
-function prediction_error(correct_cat, predicted_cat, η, logq)
-    q = exp(logq)
+function prediction_error(correct_cat, predicted_cat, η, logpost)
+    q = exp(logpost)
 
     return η * q * (correct_cat - predicted_cat)
 end
 
 function M_step!(agent::EMAgent, stim, correct_cat)
-    for k in eachindex(agent.logq)
+    for k in eachindex(agent.logpost)
         predicted_cat = probability_right_category(stim, agent.W[:,k]; β=agent.β)
-        agent.W[:,k] .+= stim .* prediction_error(correct_cat, predicted_cat, agent.η, agent.logq[k])
+        RPE = prediction_error(correct_cat, predicted_cat, agent.η, agent.logpost[k])
+        agent.RPE[k] = RPE
+        agent.W[:,k] .+= stim .* RPE 
     end
 end
 
 function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
-    @unpack W, logq_stim, logq = agent
+    @unpack W, logpost_stim = agent
 
-    K = length(logq)
+    K = length(logpost_stim)
 
     loglhood_category = map(Base.OneTo(K)) do k    
         P = probability_right_category(stim, W[:,k]; β=agent.β)
         loglikelihood_category(P, choice_cat) 
     end
     
-    L_data = logsumexp(loglhood_category .+ logq_stim) # log ∑ᶻ P(category|z) * P(z|stim)
+    L_data = logsumexp(loglhood_category .+ logpost_stim) # log ∑ᶻ P(category|z) * P(z|stim)
 
     return L_data
 end
@@ -256,31 +234,39 @@ function loglikelihood!(agent::EMAgent, S::AbstractMatrix, choices::AbstractVect
         local_MAP!(agent, stimulus, correct_cat)
 
         L_data += loglikelihood_trial
+        add_regressors!(agent.regressor, agent, t)
     end
 
     return L_data
 end
 
-initialise_agent(X; η=0.1, ηₓ=0.1, α=1.0, β=1.0, σ²=0.1, d=1.0) = EMAgent(X; η, ηₓ, α, β, σ², d)
+initialise_agent(X; η=0.1, ηₓ=0.05, α=1.0, β=1.0, σ²=12, s=0.0) = EMAgent(X; η, ηₓ, α, β, σ², s)
 
-function negative_loglikelihood(params::AbstractVector, S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; N_loops=1)
-    ag = initialise_agent(S; η=params[1], ηₓ=params[2], α=params[3], β=params[4], σ²=params[5])
+function negative_loglikelihood(η, β, s, X::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; ub_β = 100.0, ub_s = 100.0, N_loops=1)
+    #=
+    η = logistic(params[1])
+    β = logistic(params[2]) * ub_β
+    s = logistic(params[3]) * ub_s
+    ag = initialise_agent(S; η=η, ηₓ=ηₓ, β=β, s=s)
+    =#
+    β = β * ub_β
+    s = s * ub_s
 
-    return -loglikelihood!(ag, S, choices, corrects; N_loops)
+    ag = initialise_agent(X; η, β, s)
+    
+    return -loglikelihood!(ag, X, choices, corrects; N_loops)
 end
 
-struct GridSearch
-    step_size::Float64
-end
 
-function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
+function fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β = 100.0, ub_s = 100.0, kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
-    S = get_stimuli(df; grid_sz, σ_conv)
+    X = log.(get_stimuli(df; grid_sz, σ_conv)) # log-transform pixel values for greater resolution
 
-    p0 = [0.1, 0.1, 1.0, 1.0, 0.1]
-    lb = [0.0, 0.0, 0.0, 0.0, 0.0]
-    ub = [1.0, 1.0, 10.0, 10.0, 10.0]
+    #=
+    p0 = [0.1, 1.0, 1.0]
+    lb = [0.0, 0.0, 0.0]
+    ub = [1.0, 100.0, 100.0]
     
     obj = OptimizationFunction(
         (p, hyperp) -> negative_loglikelihood(p, S, choices, corrects),
@@ -289,109 +275,123 @@ function fit_CL(df, alg; σ_conv=5, grid_sz=(50,50), kwargs...)
    
     prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
     sol = solve(prob, alg; kwargs...)
-    
-    #=
-    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.INFO))
-    @variable(model, 0 <= η <= 1)
-    @variable(model, 0 <= ηₓ <= 1)
-    @variable(model, α >= 0)
-    @variable(model, β >= 0)
-    @variable(model, σ² >= 0)
-    @variable(model, d >= 0)
-    @objective(model, Min, negative_loglikelihood([η, ηₓ, α, β, σ², d], S, choices, corrects))
-    optimize!(model)
     =#
+
+    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.WARN, linear_solver=MumpsSolver))
+    @variable(model, 0 <= η <= 1)
+    @variable(model, 0 <= β <= 1)
+    @variable(model, 0 <= s <= 1)
+    @operator(model, neglhood, 3, (η, β, s) -> negative_loglikelihood(η, β, s, X, choices, corrects; ub_β, ub_s))
+    @objective(model, Min, neglhood(η, β, s))
+
+    optimize!(model)
+
     id = unique(df.subject_id)
     session = unique(df.session)
     run = unique(df.run)
 
-    res = CLResult(sol, grid_sz, σ_conv, id, session, run)
+    res = CLResult(model, grid_sz, σ_conv, id, session, run)
 
     return res
 end
 
 @model function category_learn(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector)
-    α ~ LogNormal(1.5,1)
-    β ~ InverseGamma(2,5)
     η ~ Beta(2,4)
-    ηₓ ~ Beta(2,4)
-    σ² ~ InverseGamma(1,0.5)
+    β ~ InverseGamma(2,5)
+    s ~ Exponential(4)
 
-    Turing.@addlogprob! - negative_loglikelihood([η, ηₓ, α, β, σ²], S, choices, corrects)
+    Turing.@addlogprob! - negative_loglikelihood([η, β, s], S, choices, corrects)
 end
 
-function results_to_regressors(res::CLResult, df)
-    df_regress = DataFrame(
-        t_loglikelihood = Float64[],
-        t_RPE_pos = Float64[],
-        t_RPE_neg = Float64[], 
-        loglikelihood = Float64[], 
-        RPE_pos = Float64[],
-        RPE_neg = Float64[]
-    )
-
-    df_fit = df[(df.subject_id .== res.subject_ID) .& (df.run .== res.run) .& (df.session .== res.session), :]
-    ST = parse.(Float64, df_fit.stim_presentation_time)
-    RT = parse.(Float64, df_fit.response_time)
-
-    C = choices(df_fit)
-    X = stimuli(df_fit; grid_sz=res.image_size, σ_conv=res.σ_convolution)
-    D, N_trials = size(X)
-
-    ag = initialise_agent(X, res.sol)
-    tm = TrialMetrics(N_trials)
-    EM_learning!(ag, X, C, tm)
+function EM_learning!(agent::EMAgent, S::AbstractMatrix, corrects::AbstractVector; N_loops=1)
+    D, N_trials = size(S)
 
     for t in Base.OneTo(N_trials)
-        
-        z_stim = ag.z_stim[t]
-        loglikelihood = tm.loglhood[t][z_stim] 
+        stimulus = S[:,t]
+        correct_cat = corrects[t]
 
-        z = ag.z[t]
-        w = t == 1 ? zeros(D) : tm.W[t-1][:, z]
-        logq = tm.logq[t][z]
-        pred_cat = probability_right_category(X[:, t], w; β=agent.β)
-        RPE = prediction_error(C[t], pred_cat, ag.η, logq)
+        for _ in Base.OneTo(N_loops)
+            E_step_stimulus!(agent, stimulus, t)
 
-        if RPE > 0.0
-            t_RPE_pos = ST[t] + RT[t]
-            RPE_pos = RPE
-            t_RPE_neg = 0.0
-            RPE_neg = 0.0
-        else
-            t_RPE_pos = 0.0
-            RPE_pos = 0.0
-            t_RPE_neg = ST[t] + RT[t]
-            RPE_neg = RPE
+            E_step_category!(agent, stimulus, correct_cat, t)
+    
+            M_step!(agent, stimulus, correct_cat)
         end
-
-        push!(
-            df_regress, 
-            (
-                t_loglikelihood = ST[t], 
-                t_RPE_pos = t_RPE_pos,
-                t_RPE_neg = t_RPE_neg, 
-                loglikelihood = loglikelihood, 
-                RPE_pos = RPE_pos,
-                RPE_neg = RPE_neg
-            )
-        )
+        local_MAP!(agent, stimulus, correct_cat)
     end
-
-    CSV.write("CL_regress_sub-$(res.subject_ID)_ses-$(res.session)_run-$(res.run).csv", df_regress)
 end
 
-function results_to_dataframe(results::Vector{<:CLResult})
+function results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
+    for r in eachrow(df_res)
+        df_regress = DataFrame(
+            t_loglikelihood = Float64[],
+            t_logposterior_stimulus = Float64[],
+            t_logposterior = Float64[],
+            t_RPE_pos = Float64[],
+            t_RPE_neg = Float64[], 
+            loglikelihood = Float64[],
+            logposterior_stimulus = Float64[],
+            logposterior = Float64[],
+            RPE_pos = Float64[],
+            RPE_neg = Float64[]
+        )
+
+        df_fit = df_data[(df_data.subject_id .== r.subject_id) .& (df_data.run .== r.run) .& (df_data.session .== r.session), :]
+        ST = parse.(Float64, df_fit.stim_presentation_time)
+        RT = parse.(Float64, df_fit.response_time)
+
+        choices = get_choices(df_fit)
+        corrects = get_correct_categories(df_fit)
+        S = log.(get_stimuli(df_fit; grid_sz, σ_conv))
+        D, N_trials = size(S)
+
+        ag = initialise_agent(S; η=r.η, β=r.β, s=r.s)
+        loglikelihood!(ag, S, choices, corrects)
+        regressor = ag.regressor
+
+        for t in Base.OneTo(N_trials)
+            RPE = regressor.RPE[t]
+            if RPE > 0.0
+                t_RPE_pos = ST[t] + RT[t]
+                RPE_pos = RPE
+                t_RPE_neg = 0.0
+                RPE_neg = 0.0
+            else
+                t_RPE_pos = 0.0
+                RPE_pos = 0.0
+                t_RPE_neg = ST[t] + RT[t]
+                RPE_neg = RPE
+            end
+
+            push!(
+                df_regress, 
+                (
+                    t_loglikelihood = ST[t],
+                    t_logposterior_stimulus = ST[t],
+                    t_logposterior = ST[t] + RT[t],
+                    t_RPE_pos = t_RPE_pos,
+                    t_RPE_neg = t_RPE_neg, 
+                    loglikelihood = regressor.loglikelihood_stimulus[t],
+                    logposterior_stimulus = regressor.logposterior_stim[t],
+                    logposterior = regressor.logposterior[t],
+                    RPE_pos = RPE_pos,
+                    RPE_neg = RPE_neg,
+                )
+            )
+        end
+
+        CSV.write("CL_regress_sub-$(r.subject_id)_ses-$(r.session)_run-$(r.run).csv", df_regress)
+    end
+end
+
+function results_to_dataframe(results::Vector{<:CLResult}; ub_β = 100.0, ub_s = 100.0)
     df = DataFrame(
         subject_id = Int64[],
         run = Int64[],
         session = String[],
         η = Float64[], 
-        ηₓ = Float64[], 
-        α = Float64[], 
         β = Float64[], 
-        σ² = Float64[],
-        d = Float64[]
+        s = Float64[]
     )
 
     for r in results
@@ -401,12 +401,9 @@ function results_to_dataframe(results::Vector{<:CLResult})
                 subject_id = only(r.subject_ID),
                 run = only(r.run),
                 session = only(r.session),
-                η = r.sol[1], 
-                ηₓ = r.sol[2], 
-                α = r.sol[3], 
-                β = r.sol[4], 
-                σ² = r.sol[5],
-                d = r.sol[6]
+                η = value(variable_by_name(r.sol, "η")), 
+                β = value(variable_by_name(r.sol, "β")) * ub_β, 
+                s = value(variable_by_name(r.sol, "s")) * ub_s
             ) 
         )
     end
@@ -424,8 +421,8 @@ function get_categorization_rules(df_data::DataFrame, df_params::DataFrame, ID, 
     S = get_stimuli(df_data_subj; σ_conv, grid_sz)
 
     @assert nrow(df_params_subj)==1
-    p = Vector(df_params_subj[1, [:η, :ηₓ, :α, :β, :σ², :d]])
-    ag = initialise_agent(S; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5], d=p[6])
+    p = Vector(df_params_subj[1, [:η, :ηₓ, :α, :β, :σ², :s]])
+    ag = initialise_agent(S; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5], s=p[6])
     loglikelihood!(ag, S, choices, corrects)
 
     return ag.z
@@ -433,7 +430,7 @@ end
 
 
 function act(agent::EMAgent, stimulus)
-    z_stim_t = argmax(agent.logq_stim)
+    z_stim_t = argmax(agent.logpost_stim)
     P = probability_right_category(stimulus, agent.W[:, z_stim_t]; β=agent.β)
     choice = Int(rand(Bernoulli(P)))
 
@@ -471,3 +468,37 @@ function run_task!(agent, env)
 
     return choices
 end
+
+get_results(file) = deserialize(file)
+
+#=
+function E_step!(agent::EMAgent, stim, correct_category, t)
+    @unpack W, S̄, N, z, logpost, α, β, σ², s = agent
+
+    K = length(logpost)
+
+    logpriors = similar(logpost)
+    loglhood_category = zeros(K)
+
+    for k in Base.OneTo(K)
+        logpriors[k] = k == K ? log(α) : logprior(k, z, t; s)
+        S̄_k = @views S̄[k]
+        loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
+        agent.loglhood_stim[k] = loglhood_stim
+
+        P = probability_right_category(stim, W[:,k]; β)
+        loglhood_category[k] = loglikelihood_category(P, correct_category) 
+
+        agent.logpost[k] = loglhood_stim + loglhood_category[k]
+        agent.logpost_stim[k] = loglhood_stim
+    end
+    
+    logpriors .-= logsumexp(logpriors)   
+
+    agent.logpost .+= logpriors 
+    agent.logpost .-= logsumexp(logpost)
+
+    agent.logpost_stim .+= logpriors
+    agent.logpost_stim .-= logsumexp(agent.logpost_stim)
+end
+=#
