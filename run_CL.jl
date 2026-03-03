@@ -44,16 +44,5 @@ for ID in IDs
     end
 end
 
-#=
-df_fit = @subset(df, :subject_id .== IDs[10], :run .== 1, :session .== "glc")
-
-res = fit_CL(df_fit; maxtime = 5000.0, σ_conv, grid_sz)
-
-choices = get_choices(df_fit)
-corrects = get_correct_categories(df_fit)
-S = get_stimuli(df_fit; grid_sz, σ_conv)
-
-negative_loglikelihood([0.8, 0.95, 5.3], S, choices, corrects)
-
-chain = sample(model, dynamic_nuts, 1_000, progress=true)
-=#
+df_res = results_to_dataframe(res)
+CSV.write("CL_model_params_$(session)_run_$(run).csv", df_res)
