@@ -298,9 +298,9 @@ end
 @model function category_learn(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector)
     η ~ Beta(2,4)
     β ~ InverseGamma(2,5)
-    s ~ Exponential(4)
+    s ~ Exponential(5)
 
-    Turing.@addlogprob! - negative_loglikelihood([η, β, s], S, choices, corrects)
+    Turing.@addlogprob! - negative_loglikelihood(η, β, s, S, choices, corrects; ub_β=1, ub_s=1)
 end
 
 function EM_learning!(agent::EMAgent, S::AbstractMatrix, corrects::AbstractVector; N_loops=1)
