@@ -30,15 +30,11 @@ IDs = unique(df.subject_id)
 σ_conv = 5
 grid_sz = (50,50)
 
-df_res = CSV.read("CL_model_params_glc.csv", DataFrame)
-
-results_to_regressors(df_res, df; σ_conv, grid_sz)
-
-run = 1
+run = 2
 session = "bhb"
 
 res = CLResult[] 
-for ID in IDs[1]
+for ID in IDs
     @show ID
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
