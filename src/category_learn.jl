@@ -34,7 +34,7 @@ mutable struct EMAgent{T, R <: AbstractRegressor}
         z_stim = Int[]
         W = zeros(typeof(s), D, 1)
         S̄ = [zeros(typeof(s), D, 2)]
-        regressor = EMRegressor(N_trials)
+        regressor = EMRegressor(N_trials, typeof(s))
 
         new{typeof(η), typeof(regressor)}(W, S̄, N, logpost, logpost_stim, loglhood_stim, loglhood_category, logprior, RPE, z, z_stim, N_loops, α, β, η, ηₓ, σ², s, regressor)
     end
@@ -49,20 +49,20 @@ struct CLResult
     run
 end
 
-struct EMRegressor <: AbstractRegressor
-    RPE::Vector{Float64}
-    loglikelihood_stimulus::Vector{Float64}
-    loglikelihood_category::Vector{Float64}
-    logposterior_stim::Vector{Float64}
-    logposterior::Vector{Float64}
+struct EMRegressor{T} <: AbstractRegressor
+    RPE::Vector{T}
+    loglikelihood_stimulus::Vector{T}
+    loglikelihood_category::Vector{T}
+    logposterior_stim::Vector{T}
+    logposterior::Vector{T}
 
-    function EMRegressor(N_trials::Int)
-        new(
-            Vector{Float64}(undef, N_trials),
-            Vector{Float64}(undef, N_trials), 
-            Vector{Float64}(undef, N_trials), 
-            Vector{Float64}(undef, N_trials),
-            Vector{Float64}(undef, N_trials)
+    function EMRegressor(N_trials::Int, T::DataType)
+        new{T}(
+            Vector{T}(undef, N_trials),
+            Vector{T}(undef, N_trials), 
+            Vector{T}(undef, N_trials), 
+            Vector{T}(undef, N_trials),
+            Vector{T}(undef, N_trials)
         )
     end
 end
