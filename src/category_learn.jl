@@ -243,12 +243,6 @@ end
 initialise_agent(X; η=0.1, ηₓ=0.05, α=1.0, β=1.0, σ²=12, s=0.0) = EMAgent(X; η, ηₓ, α, β, σ², s)
 
 function negative_loglikelihood(η, β, s, X::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; ub_β = 100.0, ub_s = 100.0, N_loops=1)
-    #=
-    η = logistic(params[1])
-    β = logistic(params[2]) * ub_β
-    s = logistic(params[3]) * ub_s
-    ag = initialise_agent(S; η=η, ηₓ=ηₓ, β=β, s=s)
-    =#
     β = β * ub_β
     s = s * ub_s
 
@@ -262,20 +256,6 @@ function fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β = 100.0, ub_s = 100.0, kwa
     choices = get_choices(df)
     corrects = get_correct_categories(df)
     X = log.(get_stimuli(df; grid_sz, σ_conv)) # log-transform pixel values for greater resolution
-
-    #=
-    p0 = [0.1, 1.0, 1.0]
-    lb = [0.0, 0.0, 0.0]
-    ub = [1.0, 100.0, 100.0]
-    
-    obj = OptimizationFunction(
-        (p, hyperp) -> negative_loglikelihood(p, S, choices, corrects),
-        Optimization.AutoForwardDiff()
-    )
-   
-    prob = OptimizationProblem(obj, p0, lb = lb, ub = ub)
-    sol = solve(prob, alg; kwargs...)
-    =#
 
     model = Model(()->MadNLP.Optimizer(print_level=MadNLP.WARN, linear_solver=MumpsSolver))
     @variable(model, 0 <= η <= 1)
