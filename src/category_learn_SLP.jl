@@ -16,9 +16,6 @@ function prediction_error(correct_cat, predicted_cat, η)
 end
 
 function objective(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector, p)
-    #agent = initialise_agent(S, p) 
-    #return -loglikelihood(agent, S, choices, corrects)
-
     η, β = p
 
     D, N_trials = size(S)
