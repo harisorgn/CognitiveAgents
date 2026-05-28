@@ -31,7 +31,7 @@ IDs = unique(df.subject_id)
 grid_sz = (50,50)
 
 run = 2
-session = "bhb"
+session = "glc"
 
 res = CLResult[] 
 for ID in IDs
@@ -46,3 +46,8 @@ end
 
 df_res = results_to_dataframe(res)
 CSV.write("CL_model_params_$(session)_run_$(run).csv", df_res)
+
+
+df_res = CSV.read("CL_model_params_bhb_run_2.csv", DataFrame)
+
+results_to_regressors(df_res, df; σ_conv, grid_sz)
