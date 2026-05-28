@@ -1,28 +1,3 @@
-@model function category_match(response_dots, dot_evidence, choices)
-    #σ ~ InverseGamma(2,8)
-    β ~ LogNormal(4,1)
-    P_lapse ~ Beta(1,20)
-
-    N_trials = length(response_dots)
-    for t in Base.OneTo(N_trials)
-        RD = response_dots[t]
-        evidence = dot_evidence[t]
-        z_left, z_right = sum(evidence[1:RD, :]; dims=1)
-
-        #β = pi / (σ * sqrt(6*(RD - 1)))
-        P_left = logistic(β * (z_left - z_right))
-        P_choices = [P_left, 1 - P_left]
-        
-        choice_idx = choices[t] + 1
-        P_choice = P_choices[choice_idx] * (1 - P_lapse) + P_lapse / 2
-        #P_choice = P_choices[choice_idx]
-        choices[t] ~ Bernoulli(P_choice)
-    end
-
-    return (; β, P_lapse, choices)
-    #return (; β, choices)
-end
-
 function probability_choices(Delta_loglikelihoods::Float64, β, P_lapse)
     P_left = logistic(β * Delta_loglikelihoods)
     
@@ -64,17 +39,6 @@ struct CMResult
     subject_ID
     session
     run
-end
-
-function fit_CM(df; kwargs...)
-    L = get_loglikelihood_dots(df)
-    C = get_choices(df)
-    RD = get_response_dots(df)
-
-    model = category_match(RD, L, C)
-    chain = sample(model, NUTS(), 2_000, progress=false)
-
-    return chain
 end
 
 function fit_CM(df, alg; kwargs...)
