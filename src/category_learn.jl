@@ -89,11 +89,9 @@ function loglikelihood_category(P_right_cat, cat)
 end
 
 function loglikelihood_stimulus(stim, S̄, N; σ²=0.1)
+    # These prior hyperparameters assume that the stimulus has been log-transformed!
     μ₀ = -3
     σ₀² = 1
-
-    #μ₀ = 0.1
-    #σ₀² = 0.04
     
     D, N_cats = size(S̄)
 
