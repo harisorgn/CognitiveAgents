@@ -12,7 +12,7 @@ cols = [
 ]
 
 task = "task3"
-dir = joinpath("../data", "bipolar")
+dir = joinpath(@__DIR__, "../data", "bipolar")
 files = mapreduce(x -> readdir(x; join=true), vcat, readdir(dir; join=true))
 
 filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
