@@ -1,18 +1,3 @@
-@model function ddm(data, conditions, N_conditions; min_rt=0.2)
-
-    α ~ LogNormal(1, 0.5)
-    τ ~ Uniform(0.0, min_rt)
-    z ~ Beta(1.5, 1.5)
-
-    drift_intercept ~ Normal(0, 1)
-    drift_slope ~ Normal(0, 1)
-
-    drift = drift_intercept .+ drift_slope .* conditions
-
-    Turing.@addlogprob! sum(logpdf.(DDM.(drift, α, z, τ), data))
-
-end
-
 function objective(p, data, aggressiveness)
     α, τ, z, drift_intercept, drift_slope = p
     drifts = drift_intercept .+ (drift_slope .* aggressiveness)
