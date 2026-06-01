@@ -273,14 +273,6 @@ function fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β = 100.0, ub_s = 100.0, kwa
     return res
 end
 
-@model function category_learn(S::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector)
-    η ~ Beta(2,4)
-    β ~ InverseGamma(2,5)
-    s ~ Exponential(5)
-
-    Turing.@addlogprob! - negative_loglikelihood(η, β, s, S, choices, corrects; ub_β=1, ub_s=1)
-end
-
 function EM_learning!(agent::EMAgent, S::AbstractMatrix, corrects::AbstractVector; N_loops=1)
     D, N_trials = size(S)
 
