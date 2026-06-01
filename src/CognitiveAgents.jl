@@ -5,16 +5,11 @@ using Distributions
 using CommonRLInterface
 import CommonRLInterface: reset!, actions, observe, terminated, act!
 
-using Turing
-
 using Optimization
 using Optim
 using JuMP
 using Ipopt
 using MadNLP
-using MadNLPHSL
-using MadNLPKrylov
-using MadNLPMumps
 
 using DelimitedFiles: readdlm
 using CSV
