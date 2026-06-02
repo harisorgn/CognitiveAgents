@@ -44,7 +44,7 @@ struct CLResult
     sol
     image_size
     σ_convolution
-    subject_ID
+    subject_id
     session
     run
 end
@@ -112,7 +112,13 @@ kernel(t1, t2; L=1) = L / (t1 - t2)
 function logprior(k, z, t; s=0)
     t_past = Base.OneTo(t-1)
     
-    return log(sum(kernel.((t,), t_past[z .== k]))) + s
+    zₜ = last(z)
+
+    if k == zₜ
+        return log(sum(kernel.((t,), t_past[z .== k]))) + s
+    else
+        return log(sum(kernel.((t,), t_past[z .== k])))
+    end
 end
 
 function update_latent_factor!(zs, logpost)
@@ -255,10 +261,10 @@ function fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β = 100.0, ub_s = 100.0, kwa
     corrects = get_correct_categories(df)
     X = log.(get_stimuli(df; grid_sz, σ_conv)) # log-transform pixel values for greater resolution
 
-    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.WARN, linear_solver=MumpsSolver))
-    @variable(model, 0 <= η <= 1)
-    @variable(model, 0 <= β <= 1)
-    @variable(model, 0 <= s <= 1)
+    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.WARN, linear_solver=LapackCPUSolver))
+    @variable(model, 1e-4 <= η <= 1)
+    @variable(model, 1e-4 <= β <= 1)
+    @variable(model, 1e-4 <= s <= 1)
     @operator(model, neglhood, 3, (η, β, s) -> negative_loglikelihood(η, β, s, X, choices, corrects; ub_β, ub_s))
     @objective(model, Min, neglhood(η, β, s))
 
@@ -291,7 +297,7 @@ function EM_learning!(agent::EMAgent, S::AbstractMatrix, corrects::AbstractVecto
     end
 end
 
-function results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
+function CL_results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
     for r in eachrow(df_res)
         df_regress = DataFrame(
             t_loglikelihood = Float64[],
@@ -368,7 +374,7 @@ function results_to_dataframe(results::Vector{<:CLResult}; ub_β = 100.0, ub_s =
         push!(
             df,
             (
-                subject_id = only(r.subject_ID),
+                subject_id = only(r.subject_id),
                 run = only(r.run),
                 session = only(r.session),
                 η = value(variable_by_name(r.sol, "η")), 
@@ -439,36 +445,3 @@ function run_task!(agent, env)
     return choices
 end
 
-get_results(file) = deserialize(file)
-
-#=
-function E_step!(agent::EMAgent, stim, correct_category, t)
-    @unpack W, S̄, N, z, logpost, α, β, σ², s = agent
-
-    K = length(logpost)
-
-    logpriors = similar(logpost)
-    loglhood_category = zeros(K)
-
-    for k in Base.OneTo(K)
-        logpriors[k] = k == K ? log(α) : logprior(k, z, t; s)
-        S̄_k = @views S̄[k]
-        loglhood_stim = loglikelihood_stimulus(stim, S̄_k, N[k]; σ²)
-        agent.loglhood_stim[k] = loglhood_stim
-
-        P = probability_right_category(stim, W[:,k]; β)
-        loglhood_category[k] = loglikelihood_category(P, correct_category) 
-
-        agent.logpost[k] = loglhood_stim + loglhood_category[k]
-        agent.logpost_stim[k] = loglhood_stim
-    end
-    
-    logpriors .-= logsumexp(logpriors)   
-
-    agent.logpost .+= logpriors 
-    agent.logpost .-= logsumexp(logpost)
-
-    agent.logpost_stim .+= logpriors
-    agent.logpost_stim .-= logsumexp(agent.logpost_stim)
-end
-=#
