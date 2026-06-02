@@ -1,5 +1,4 @@
-function objective(p, data, aggressiveness)
-    α, τ, z, drift_intercept, drift_slope = p
+function negative_loglikelihood(α, τ, z, drift_intercept, drift_slope, data, aggressiveness)
     drifts = drift_intercept .+ (drift_slope .* aggressiveness)
 
     return -sum(logpdf.(DDM.(drifts, α, z, τ), data))
@@ -13,13 +12,13 @@ end
 
 struct FacesResult
     sol
-    subject_ID
+    subject_id
     session
     run
 end
 
-function fit_faces(df, alg; min_rt = 0.2, kwargs...)
-    df_agr = read_aggressiveness(df; normalize=true)
+function fit_faces(df; min_rt = 0.2, kwargs...)
+    df_agr = read_aggressiveness(df; zero_center=true)
     add_data!(df, df_agr)
 
     filter!(:rt => rt -> !ismissing(rt) && rt >= min_rt, df)
@@ -28,19 +27,18 @@ function fit_faces(df, alg; min_rt = 0.2, kwargs...)
         (choice = r.choice, rt = r.rt)
     end
 
-    obj = OptimizationFunction(
-        (p, hyperp) -> objective(p, data, df.score),
-        Optimization.AutoForwardDiff()
-    )
-    p0 = [1.0, 0.1, 0.5, 0.0, 1.0]
-    prob = OptimizationProblem(obj, p0, lb = [0.5, 0.0, 0.0, -Inf, -Inf], ub = [Inf, Inf, 1.0, Inf, Inf])
-    sol = solve(prob, alg; kwargs...)
+    model = Model(()->MadNLP.Optimizer(print_level=MadNLP.WARN, linear_solver=LapackCPUSolver))
+    @variable(model, 0.5 <= α <= Inf)
+    @variable(model, 1e-4 <= τ <= minimum(df.rt))
+    @variable(model, 1e-4 <= z <= 1.0)
+    @variable(model, -Inf <= drift_intercept <= Inf)
+    @variable(model, -Inf <= drift_slope <= Inf)
+    @operator(model, neglhood, 5, (α, τ, z, drift_intercept, drift_slope) -> negative_loglikelihood(α, τ, z, drift_intercept, drift_slope, data, df.score))
+    @objective(model, Min, neglhood(α, τ, z, drift_intercept, drift_slope))
 
-    id = unique(df.subject_id)
-    session = unique(df.session)
-    run = unique(df.run)
+    optimize!(model)
 
-    res = FacesResult(sol, id, session, run)
+    res = FacesResult(model, unique(df.subject_id), unique(df.session), unique(df.run))
 
     return res
 end
@@ -57,19 +55,25 @@ function results_to_dataframe(results::Vector{<:FacesResult})
         drift_intercept = Float64[],
         drift_slope = Float64[],
         drift_angry = Float64[],
-        drift_neutral = Float64[]
+        drift_neutral = Float64[],
+        drift_ambiguous = Float64[]
     )
 
     for r in results
-        α, τ, z, drift_intercept, drift_slope = r.sol
+        α = value(variable_by_name(r.sol, "α"))
+        τ = value(variable_by_name(r.sol, "τ")) 
+        z = value(variable_by_name(r.sol, "z")) 
+        drift_intercept = value(variable_by_name(r.sol, "drift_intercept")) 
+        drift_slope = value(variable_by_name(r.sol, "drift_slope"))
 
         drift_angry = drift_intercept - 4.5 * drift_slope
         drift_neutral = drift_intercept + 4.5 * drift_slope
+        drift_ambiguous = drift_intercept
 
         push!(
             df,
             (
-                subject_id = only(r.subject_ID),
+                subject_id = only(r.subject_id),
                 run = only(r.run),
                 session = only(r.session),
                 α = α,
@@ -78,7 +82,8 @@ function results_to_dataframe(results::Vector{<:FacesResult})
                 drift_intercept = drift_intercept,
                 drift_slope = drift_slope,
                 drift_angry = drift_angry,
-                drift_neutral = drift_neutral
+                drift_neutral = drift_neutral,
+                drift_ambiguous = drift_intercept
             ) 
         )
     end
@@ -87,39 +92,41 @@ function results_to_dataframe(results::Vector{<:FacesResult})
     return df
 end
 
-function results_to_regressors(res::FacesResult, df; trial_duration=4, T_sample=0.4)
-    subject_ID = only(res.subject_ID)
-    run = only(res.run)
-    session = only(res.session)
+function faces_results_to_regressors(df_res, df; trial_duration=4, T_sample=0.4)
+    for r in eachrow(df_res)
+        df_fit = @subset(df, :subject_id .== r.subject_id, :run .== r.run, :session .== r.session)
+        df_agr = read_aggressiveness(df_fit; zero_center=true)
+        add_data!(df_fit, df_agr)
 
-    df_fit = @subset(df, :subject_id .== subject_ID, :run .== run, :session .== session)
-    df_agr = read_aggressiveness(df_fit; normalize=false)
-    add_data!(df_fit, df_agr)
+        df_regress = DataFrame(t = Float64[], evidence = Float64[])
 
-    df_regress = DataFrame(t = Float64[], evidence = Float64[])
+        aggressiveness = df_fit.score
+        RTs = get_response_times(df_fit)
 
-    aggressiveness = df_fit.score
-    RTs = get_response_times(df_fit)
+        α = r.α 
+        τ = r.τ
+        z = r.z 
+        drift_intercept = r.drift_intercept 
+        drift_slope = r.drift_slope
+        drifts = drift_intercept .+ drift_slope .* aggressiveness
 
-    α, τ, z, drift_intercept, drift_slope = res.sol
-    drifts = drift_intercept .+ drift_slope .* aggressiveness
+        for (i, RT) in enumerate(RTs)
+            t_regress = if RT > T_sample
+                range(T_sample, RT, step = T_sample)
+            else
+                [RT]
+            end
 
-    for (i, RT) in enumerate(RTs)
-        t_regress = if RT > T_sample
-            range(T_sample, RT, step = T_sample)
-        else
-            [RT]
+            for t in t_regress
+                ev = drifts[i] * t
+                t_sample = t + (i - 1) * trial_duration
+                push!(
+                    df_regress, 
+                    (t = t_sample, evidence = ev)
+                )
+            end
         end
 
-        for t in t_regress
-            ev = drifts[i] * t
-            t_sample = t + (i - 1) * trial_duration
-            push!(
-                df_regress, 
-                (t = t_sample, evidence = ev)
-            )
-        end
+        CSV.write("faces_regress_sub-$(r.subject_id)_ses-$(r.session)_run-$(r.run).csv", df_regress)
     end
-
-    CSV.write("faces_regress_sub-$(subject_ID)_ses-$(session)_run-$(run).csv", df_regress)
 end

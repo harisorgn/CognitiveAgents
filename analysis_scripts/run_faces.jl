@@ -1,7 +1,7 @@
 using CognitiveAgents
 using Serialization
-using OptimizationOptimJL
 using DataFramesMeta
+using CSV
 
 cols = [
     :subject_id,
@@ -20,34 +20,25 @@ filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 df = read_data_bipolar(files, cols)
 
 IDs = unique(df.subject_id)
-alg = Optim.IPNewton()
 
-run = 2
+run = 1
 session = "bhb"
-for ID in IDs
+res = FacesResult[]
+for ID in IDs[1:5]
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
     if !isempty(df_fit)
-        res = fit_faces(df_fit, alg)
-        serialize("faces_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+        res_subj = fit_faces(df_fit)
+        push!(res, res_subj)
     end
 end
 
-session = "glc"
-for ID in IDs
-    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
+df_res = results_to_dataframe(res)
+CSV.write("faces_model_params_$(session)_run_$(run).csv", df_res)
 
-    if !isempty(df_fit)
-        res = fit_faces(df_fit, alg)
-        serialize("faces_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
-    end
-end
+faces_results_to_regressors(df_res, df)
 
-dir = joinpath("./results", "faces_match")
-files = readdir(dir; join=true)
-res = deserialize.(files)
-df = results_to_dataframe(res)
+figure_RT_faces(df)
 
-figure_faces_model(df)
+figure_psychophysics_faces(df)
 
-figure_faces_model_param_diff(df)
