@@ -47,7 +47,4 @@ end
 df_res = results_to_dataframe(res)
 CSV.write("CL_model_params_$(session)_run_$(run).csv", df_res)
 
-
-df_res = ("CL_model_params_$(session)_run_$(run).csv", DataFrame)
-
-results_to_regressors(df_res, df; σ_conv, grid_sz)
+CL_results_to_regressors(df_res, df; σ_conv, grid_sz)
