@@ -1,105 +1,4 @@
-function plot_subject_accuracy!(ax::Axis, df::DataFrame, N_trials_per_set, N_trials_average; label="", kwargs...)
-    sets = unique(df[!, :set])
-    N_points = N_trials_per_set / N_trials_average
-
-    xs = collect(1:N_points)
-    for s in sets
-        corrects = get_corrects(df[df.set .== s, :])
-        acc = mean.(partition(corrects, N_trials_average))
-    
-        scatter!(ax, xs, acc; kwargs... )
-        lines!(ax, xs, acc; label, kwargs...)
-        
-        xs .+= N_points
-    end
-end
-
-function plot_subject_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_trials_average; label="", kwargs...)
-    sets = unique(combine(gdf, :set).set)
-    N_points = N_trials_per_set / N_trials_average
-
-    df = combine(gdf, :correct => mean => :accuracy, :set => only ∘ unique => :set)
-
-    xs = collect(1:N_points)
-    for s in sets
-        acc = mean.(partition(df[df.set .== s, :accuracy], N_trials_average))
-    
-        scatter!(ax, xs, acc; kwargs... )
-        lines!(ax, xs, acc; label, kwargs...)
-        
-        xs .+= N_points
-    end
-end
-
-function figure_subject_accuracy(df; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save=false, title="")
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    sets = unique(df[!, :set])
-
-    N_points_per_set = N_trials_per_set / N_trials_average
-    xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
-    
-    f = Figure(;size = (1024, 768), fontsize=30)
-    ax = Axis(
-        f[1, 1], 
-        title = title,
-        ylabel = "Accuracy",
-        xticks = (xlabel_ticks , ["Set 1", "Set 2", "Set 3", "Set 4"])
-    )
-    hidexdecorations!(ax, ticklabels = false)
-
-    gdf = groupby(df, :subject_id)
-    for (i,df_subj) in enumerate(gdf)
-        color = (colormap[mod(i, length(colormap))+1], 0.3)
-        plot_subject_accuracy!(ax, df_subj, N_trials_per_set, N_trials_average; color)
-    end
-
-    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
-    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
-
-    if save
-        save(string("CL_subject_acc_", name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_subject_accuracy(df, res::CLResult; N_trials_per_set=20, N_trials_average::Int=Int(round(N_trials_per_set/5)), name="", save_fig=false, title="")
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    sets = unique(df[!, :set])
-
-    N_points_per_set = N_trials_per_set / N_trials_average
-    xlabel_ticks = (N_points_per_set/2):N_points_per_set:(N_points_per_set * length(sets))
-    
-    f = Figure(;size = (1024, 768), fontsize=26)
-    ax = Axis(
-        f[1, 1], 
-        title = title,
-        ylabel = "Accuracy",
-        xticks = (xlabel_ticks , ["Set 1", "Set 2", "Set 3", "Set 4"])
-    )
-    hidexdecorations!(ax, ticklabels = false)
-
-    plot_subject_accuracy!(ax, df, N_trials_per_set, N_trials_average; color = colormap[1], label = "Data")
-
-    df_sim = run_CL_task(df, res; N_runs = 100)
-    gdf_sim = groupby(df_sim, :trial_index)
-    plot_subject_accuracy!(ax, gdf_sim, N_trials_per_set, N_trials_average; color = colormap[2], label = "Model")
-
-    vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 2, color=:gray)
-    hlines!(ax, [0.5], linestyle = :dash, linewidth = 2, color=:grey)
-
-    f[1, 2] = Legend(f, ax, framevisible = false, unique = true)
-
-    if save_fig
-        save(string("CL_subject_acc.png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_subjects; label="", colormap=ColorSchemes.seaborn_bright.colors)
+function plot_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_subjects; label="", colormap=ColorSchemes.seaborn_bright.colors)
     sets = unique(combine(gdf, :set).set)
     N_points = N_trials_per_set
     
@@ -123,7 +22,7 @@ function plot_group_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set,
     end
 end
 
-function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", save_fig=false, title="")
+function figure_accuracy(df, N_trials_per_set=20; name="CL_group_acc", save_fig=false, title="")
     colormap = ColorSchemes.seaborn_bright.colors
 
     sets = unique(df[!, :set])
@@ -142,7 +41,7 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
 
     N_subjects = length(unique(df[!, :subject_id]))  
     gdf = groupby(df, :trial_index)
-    plot_group_accuracy!(ax, gdf, N_trials_per_set, N_subjects; colormap)
+    plot_accuracy!(ax, gdf, N_trials_per_set, N_subjects; colormap)
 
     vlines!(ax, collect(N_points_per_set:N_points_per_set:(N_points_per_set * length(sets))), linestyle = :dash, linewidth = 4, color=:gray)
     hlines!(ax, [0.5], linestyle = :dash, linewidth = 4, color=:grey)
@@ -155,15 +54,20 @@ function figure_group_accuracy(df ; N_trials_per_set=20, name="CL_group_acc", sa
 end
 
 function plot_cumulative_RT!(ax::Axis, gdf::GroupedDataFrame, xs; colormap=ColorSchemes.seaborn_bright.colors)
-    for (i, df_subj) in enumerate(gdf) 
+    cum_RT_subj = mapreduce(hcat, enumerate(gdf)) do (i, df_subj) 
         RT = df_subj.response_time
         filter!(r -> r != "None", RT)
         RT = parse.(Float64, RT)
         
         f = ecdf(RT)
-        
-        lines!(ax, xs, f.(xs); label, color = colormap[mod(i, length(colormap))+1])
+        f.(xs)
     end
+
+    μ = vec(mean(cum_RT_subj; dims=2))
+    sem = vec(std(cum_RT_subj; dims=2) ./ sqrt(length(gdf)))
+
+    lines!(ax, xs, μ; color = colormap[1])
+    band!(ax, xs, μ .- sem, μ .+ sem; color = (colormap[2], 0.3))
 end
 
 function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="")
@@ -179,7 +83,7 @@ function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="
     )
 
     gdf = groupby(df, :subject_id)
-    xs = first(xlims):0.001:last(xlims)
+    xs = collect(first(xlims):0.001:last(xlims))
     plot_cumulative_RT!(ax, gdf, xs; colormap)
 
     if save_fig
@@ -298,7 +202,7 @@ function figure_RT_faces(df::DataFrame ; save_fig=false, name="", title="")
         ylabel = "Response Time [sec]"
     )
 
-    df_agr = read_aggressiveness(df; normalize=false)
+    df_agr = read_aggressiveness(df; zero_center=false)
     add_data!(df, df_agr)
     
     plot_RT_faces!(ax, df; color=colormap[1])
@@ -410,22 +314,10 @@ function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", titl
         ylabel = "Probability of friend response"
     )
 
-    df_agr = read_aggressiveness(df; normalize=false)
+    df_agr = read_aggressiveness(df; zero_center=false)
     add_data!(df, df_agr)
-
-    df_ctrl_base = @subset(df, :subject_id .<= 99, :run .== 1)
-    df_ctrl_glc = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "glc")
-    df_ctrl_bhb = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "bhb")
-    df_bp_base = @subset(df, :subject_id .> 99, :run .== 1)
-    df_bp_glc = @subset(df, :subject_id .> 99, :run .== 2, :session .== "glc")
-    df_bp_bhb = @subset(df, :subject_id .> 99, :run .== 2, :session .== "bhb")
     
-    !isempty(df_ctrl_base) && plot_psychophysics_faces!(ax, df_ctrl_base; color=colormap[1], label="Control Baseline")
-    !isempty(df_ctrl_glc) && plot_psychophysics_faces!(ax, df_ctrl_glc; color=colormap[2], label="Control GLC")
-    !isempty(df_ctrl_bhb) && plot_psychophysics_faces!(ax, df_ctrl_bhb; color=colormap[3], label="Control BHB")
-    !isempty(df_bp_base) && plot_psychophysics_faces!(ax, df_bp_base; color=colormap[4], label="Bipolar Baseline")
-    !isempty(df_bp_glc) && plot_psychophysics_faces!(ax, df_bp_glc; color=colormap[5], label="Bipolar GLC")
-    !isempty(df_bp_bhb) && plot_psychophysics_faces!(ax, df_bp_bhb; color=colormap[6], label="Bipolar BHB")
+    plot_psychophysics_faces!(ax, df; color=colormap[1])
 
     image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./stimuli/face_angry.png")))
  
@@ -434,8 +326,6 @@ function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", titl
     image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./stimuli/face_neutral.png")))
 
     ylims!.(ax, -0.3, 1.0)
-
-    f[1, 2] = Legend(f, ax, framevisible = false)
 
     if save_fig
         save(string(name, ".png"), f, pt_per_unit=1)
@@ -464,11 +354,12 @@ function figure_psychophysics_faces(df::DataFrame, res::FacesResult; save_fig=fa
 
     scores = sort(unique(df.score))
     plot_faces_psychophysics!(ax, res, scores; color=colormap[2], label = "Model")
-    #image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./figures/angry.png")))
+    
+    image!(ax, (0.5,1.5), (-0.25,-0.05), rotr90(load("./stimuli/face_angry.png")))
  
-    #image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./figures/ambiguous.png")))
+    image!(ax, (4.5,5.5), (-0.25,-0.05), rotr90(load("./stimuli/face_ambiguous.png")))
 
-    #image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./figures/neutral.png")))
+    image!(ax, (9.5,10.5), (-0.25,-0.05), rotr90(load("./stimuli/face_neutral.png")))
 
     ylims!.(ax, -0.3, 1.0)
 
@@ -476,553 +367,6 @@ function figure_psychophysics_faces(df::DataFrame, res::FacesResult; save_fig=fa
 
     if save_fig
         save("faces_psychophysics_model.png", f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function plot_param_diff!(ax, df, param, sessions; colormap = ColorSchemes.seaborn_bright.colors)
-    IDs = unique(df.subject_ID)
-    runs = unique(df.run)
-
-    @assert length(runs) == 2 
-
-    for (i, ID) in enumerate(IDs)
-        Δp = map(enumerate(sessions)) do (j,s)
-            only(df[(df.subject_ID .== ID) .& (df.session .== s) .& (df.run .== 2), param]) - only(df[(df.subject_ID .== ID) .& (df.session .== s) .& (df.run .== 1), param])
-        end
-        scatter!(ax, 1:length(sessions), Δp; color = color=(colormap[mod(i, length(colormap))+1]))
-        lines!(ax, 1:length(sessions), Δp; color = color=(colormap[mod(i, length(colormap))+1]))
-    end
-end
-
-function plot_param!(ax, x, v; kwargs...)
-    N = length(v)
-    μ = mean(v)
-    sem = std(v) / sqrt(N)
-
-    scatter!(ax, fill(x, N), v; kwargs...)
-    scatter!(ax, [x], [μ]; color=:black)
-    errorbars!(ax, [x], [μ], sem; color=:black) 
-end
-
-function figure_CL_model(df; save_fig=false, name="")
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    f = Figure(;size = (1280, 720), fontsize=22)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Learning rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Prototype learning rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Inverse stickiness",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Inverse temperature",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Prototype variance",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Memory decay rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[3, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Categorization rules",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            )
-    ]
-
-    df_control = @subset(df, :subject_id .<= 99)
-    df_bipolar = @subset(df, :subject_id .> 99)
-
-    plot_param!(ax[1], 1, df_control.η; color=(colormap[1], 0.25))
-    plot_param!(ax[1], 2, df_bipolar.η; color=(colormap[2], 0.25))
-
-    plot_param!(ax[2], 1, df_control.ηₓ; color=(colormap[1], 0.25))
-    plot_param!(ax[2], 2, df_bipolar.ηₓ; color=(colormap[2], 0.25))
-
-    plot_param!(ax[3], 1, df_control.α; color=(colormap[1], 0.25))
-    plot_param!(ax[3], 2, df_bipolar.α; color=(colormap[2], 0.25))
-
-    plot_param!(ax[4], 1, df_control.β; color=(colormap[1], 0.25))
-    plot_param!(ax[4], 2, df_bipolar.β; color=(colormap[2], 0.25))
-
-    plot_param!(ax[5], 1, df_control.σ²; color=(colormap[1], 0.25))
-    plot_param!(ax[5], 2, df_bipolar.σ²; color=(colormap[2], 0.25))
-
-    plot_param!(ax[6], 1, df_control.d; color=(colormap[1], 0.25))
-    plot_param!(ax[6], 2, df_bipolar.d; color=(colormap[2], 0.25))
-
-    plot_param!(ax[7], 1, df_control.N_rules; color=(colormap[1], 0.25))
-    plot_param!(ax[7], 2, df_bipolar.N_rules; color=(colormap[2], 0.25))
-    
-    xlims!.(ax, 0.8, 2.2)
-
-    supertitle = f[0, :] = Label(f, "Dot Category Learn model parameters",
-        fontsize = 30, color = (:black, 0.6))
-
-    if save_fig
-        save(string(name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_CL_model_param_diff(df; save_fig=false, name="")
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    f = Figure(;size = (1280, 720), fontsize=22)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Learning rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Prototype learning rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Inverse stickiness",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Inverse temperature",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Prototype variance",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[2, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Memory decay rate",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[3, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Categorization rules",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            )
-    ]
-
-    df_control_base = @subset(df, :subject_id.<=99, :run.==1)
-    df_bipolar_base = @subset(df, :subject_id.>99, :run.==1)
-    df_control_drug = @subset(df, :subject_id.<=99, :run.==2)
-    df_bipolar_drug = @subset(df, :subject_id.>99, :run.==2)
-
-    plot_param!(ax[1], 1, df_control_drug.η .- df_control_base.η; color=(colormap[1], 0.25))
-    plot_param!(ax[1], 2, df_bipolar_drug.η .- df_bipolar_base.η; color=(colormap[2], 0.25))
-
-    plot_param!(ax[2], 1, df_control_drug.ηₓ .- df_control_base.ηₓ; color=(colormap[1], 0.25))
-    plot_param!(ax[2], 2, df_bipolar_drug.ηₓ .- df_bipolar_base.ηₓ; color=(colormap[2], 0.25))
-
-    plot_param!(ax[3], 1, df_control_drug.α .- df_control_base.α; color=(colormap[1], 0.25))
-    plot_param!(ax[3], 2, df_bipolar_drug.α .- df_bipolar_base.α; color=(colormap[2], 0.25))
-
-    plot_param!(ax[4], 1, df_control_drug.β .- df_control_base.β; color=(colormap[1], 0.25))
-    plot_param!(ax[4], 2, df_bipolar_drug.β .- df_bipolar_base.β; color=(colormap[2], 0.25))
-
-    plot_param!(ax[5], 1, df_control_drug.σ² .- df_control_base.σ²; color=(colormap[1], 0.25))
-    plot_param!(ax[5], 2, df_bipolar_drug.σ² .- df_bipolar_base.σ²; color=(colormap[2], 0.25))
-    
-    plot_param!(ax[6], 1, df_control_drug.d .- df_control_base.d; color=(colormap[1], 0.25))
-    plot_param!(ax[6], 2, df_bipolar_drug.d .- df_bipolar_base.d; color=(colormap[2], 0.25))
-    
-    plot_param!(ax[7], 1, df_control_drug.N_rules .- df_control_base.N_rules; color=(colormap[1], 0.25))
-    plot_param!(ax[7], 2, df_bipolar_drug.N_rules .- df_bipolar_base.N_rules; color=(colormap[2], 0.25))
-    
-    xlims!.(ax, 0.8, 2.2)
-
-    supertitle = f[0, :] = Label(f, "Dot Category Learn model parameter differences",
-        fontsize = 30, color = (:black, 0.6))
-
-    if save_fig
-        save(string(name, ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_CM_model(df; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1280, 720), fontsize=30)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Evidence accumulation noise",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Exploration/Exploitation",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            )
-    ]
-
-    df_control = @subset(df, :subject_id .<= 99, :run .== 1)
-    df_bipolar = @subset(df, :subject_id .> 99, :run .== 1)
-
-    scatter!(ax[1], fill(1, nrow(df_control)), df_control.σ_inf; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar)), df_bipolar.σ_inf; color=colormap[2])
-
-    scatter!(ax[2], fill(1, nrow(df_control)), df_control.β; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar)), df_bipolar.β; color=colormap[2])
-
-    colgap!(f.layout, 40)
-    xlims!.(ax, 0.8, 2.2)
-    ylims!(ax[2], -1.5, 5)
-
-    supertitle = f[0, :] = Label(f, "Dot Category Match model parameters",
-        fontsize = 30, color = (:black, 0.6))
-
-    if save
-        save(string("task1_model_params", ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_CM_model_param_diff(df; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-    
-    f = Figure(;size = (1280, 720), fontsize=30)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Evidence accumulation noise",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], ["Control", "Bipolar"]),
-                ylabel = "Exploration/Exploitation",
-                xticklabelsize = 26,
-                yticklabelsize = 26
-            )
-    ]
-
-    df_control_pre = @subset(df, :subject_id .<= 99, :run .== 1, :session .== "bhb")
-    df_control_post = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "bhb")
-    df_bipolar_pre = @subset(df, :subject_id .> 99, :run .== 1, :session .== "bhb")
-    df_bipolar_post = @subset(df, :subject_id .> 99, :run .== 2, :session .== "bhb")
-
-    scatter!(ax[1], fill(1, nrow(df_control_pre)), df_control_post.σ_inf .- df_control_pre.σ_inf; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.σ_inf .- df_bipolar_pre.σ_inf; color=colormap[2])
-
-    scatter!(ax[2], fill(1, nrow(df_control_pre)), df_control_post.β .- df_control_pre.β; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.β .- df_bipolar_pre.β; color=colormap[2])
-
-    colgap!(f.layout, 40)
-    xlims!.(ax, 0.8, 2.2)
-    ylims!(ax[2], -1.5, 5)
-
-    supertitle = f[0, :] = Label(f, "Dot Category Match model parameter differences",
-        fontsize = 30, color = (:black, 0.6))
-
-    if save
-        save(string("task1_model_param_diff", ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-function figure_faces_model(df; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    fontsize_label = 18
-    labels = ["Control", "Bipolar"]
-
-    f = Figure(;size = (1280, 720), fontsize=26)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Initial bias",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Bound seperation",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[1, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Non-decision time",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Ambiguous]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Angry]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Neutral]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            )
-            
-    ]
-
-    df_control = @subset(df, :subject_id .<= 99, :run .== 1)
-    df_bipolar = @subset(df, :subject_id .> 99, :run .== 1)
-
-    scatter!(ax[1], fill(1, nrow(df_control)), df_control.z; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar)), df_bipolar.z; color=colormap[2])
-
-    scatter!(ax[2], fill(1, nrow(df_control)), df_control.α; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar)), df_bipolar.α; color=colormap[2])
-
-    scatter!(ax[3], fill(1, nrow(df_control)), df_control.τ; color=colormap[1])
-    scatter!(ax[3], fill(2, nrow(df_bipolar)), df_bipolar.τ; color=colormap[2])
-
-    scatter!(ax[4], fill(1, nrow(df_control)), df_control.drift_intercept; color=colormap[1])
-    scatter!(ax[4], fill(2, nrow(df_bipolar)), df_bipolar.drift_intercept; color=colormap[2])
-
-    scatter!(ax[5], fill(1, nrow(df_control)), df_control.drift_angry; color=colormap[1])
-    scatter!(ax[5], fill(2, nrow(df_bipolar)), df_bipolar.drift_angry; color=colormap[2])
-
-    scatter!(ax[6], fill(1, nrow(df_control)), df_control.drift_neutral; color=colormap[1])
-    scatter!(ax[6], fill(2, nrow(df_bipolar)), df_bipolar.drift_neutral; color=colormap[2])
-
-    colgap!(f.layout, 40) 
-    xlims!.(ax, 0.8, 2.2)
-    #ylims!(ax[2], -1.5, 5)
-
-    supertitle = f[0, :] = Label(f, "Faces Match model parameters",
-        fontsize = 26, color = (:black, 0.6))
-
-    if save
-        save(string("task3_model_params", ".png"), f, pt_per_unit=1)
-    end
-
-    f
-end
-
-
-function figure_faces_model_param_diff(df; save=false)
-    colormap = ColorSchemes.seaborn_bright.colors
-
-    fontsize_label = 18
-    labels = ["Control", "Bipolar"]
-
-    f = Figure(;size = (1280, 720), fontsize=26)
-    ax = [
-            Axis(
-                f[1, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Initial bias",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[1, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Bound seperation",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[1, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Non-decision time",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 1], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Ambiguous]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 2], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Angry]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            ),
-            Axis(
-                f[2, 3], 
-                title = "",
-                xlabel = "",
-                xticks = ([1,2], labels),
-                ylabel = "Drift [Neutral]",
-                xticklabelsize = fontsize_label,
-                yticklabelsize = fontsize_label
-            )
-            
-    ]
-
-    df_control_pre = @subset(df, :subject_id .<= 99, :run .== 1, :session .== "bhb")
-    df_control_post = @subset(df, :subject_id .<= 99, :run .== 2, :session .== "bhb")
-    df_bipolar_pre = @subset(df, :subject_id .> 99, :run .== 1, :session .== "bhb")
-    df_bipolar_post = @subset(df, :subject_id .> 99, :run .== 2, :session .== "bhb")
-
-    dz_control = df_control_post.z .- df_control_pre.z
-    dz_bipolar = df_bipolar_post.z .- df_bipolar_pre.z
-
-    t = EqualVarianceTTest(dz_control, dz_bipolar)
-    @show t
-    @show pvalue(t)
-
-    scatter!(ax[1], fill(1, nrow(df_control_pre)), df_control_post.z .- df_control_pre.z; color=colormap[1])
-    scatter!(ax[1], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.z .- df_bipolar_pre.z; color=colormap[2])
-
-    scatter!(ax[2], fill(1, nrow(df_control_pre)), df_control_post.α .- df_control_pre.α; color=colormap[1])
-    scatter!(ax[2], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.α .- df_bipolar_pre.α; color=colormap[2])
-
-    scatter!(ax[3], fill(1, nrow(df_control_pre)), df_control_post.τ .- df_control_pre.τ; color=colormap[1])
-    scatter!(ax[3], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.τ .- df_bipolar_pre.τ; color=colormap[2])
-
-    scatter!(ax[4], fill(1, nrow(df_control_pre)), df_control_post.drift_intercept .- df_control_pre.drift_intercept; color=colormap[1])
-    scatter!(ax[4], fill(2, nrow(df_bipolar_post)), df_bipolar_post.drift_intercept .- df_bipolar_pre.drift_intercept; color=colormap[2])
-
-    scatter!(ax[5], fill(1, nrow(df_control_pre)), df_control_post.drift_angry .- df_control_pre.drift_angry; color=colormap[1])
-    scatter!(ax[5], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.drift_angry .- df_bipolar_pre.drift_angry; color=colormap[2])
-
-    scatter!(ax[6], fill(1, nrow(df_control_pre)), df_control_post.drift_neutral .- df_control_pre.drift_neutral; color=colormap[1])
-    scatter!(ax[6], fill(2, nrow(df_bipolar_pre)), df_bipolar_post.drift_neutral .- df_bipolar_pre.drift_neutral; color=colormap[2])
-
-    colgap!(f.layout, 40) 
-    xlims!.(ax, 0.8, 2.2)
-    #ylims!(ax[2], -1.5, 5)
-
-    supertitle = f[0, :] = Label(f, "Faces Match model parameters",
-        fontsize = 26, color = (:black, 0.6))
-
-    if save
-        save(string("task3_model_params", ".png"), f, pt_per_unit=1)
     end
 
     f
@@ -1057,7 +401,7 @@ function plot_psychophysics_CM!(ax::Axis, gdf::GroupedDataFrame, edges; color)
     errorbars!(ax, edges[1:end-1], μ_P, sem_P; color) 
 end
 
-function figure_psychophysics_CM(df::DataFrame; N_points=10, name="", save_fig=false)
+function figure_psychophysics_CM(df::DataFrame; N_points=15, name="", save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
     z_left = get_loglikelihood_choice(df, 1)
@@ -1099,7 +443,6 @@ function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name=
 
     f
 end
-
 
 function figure_hrf_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     
