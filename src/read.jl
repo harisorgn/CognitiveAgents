@@ -55,7 +55,7 @@ function read_data_bipolar(files, cols; include_omissions=false)
     for f in files
         fsplt = split((split(f, '.'))[end-1], '_')
         sub_idx = findfirst(fi -> occursin("sub-",fi), fsplt)
-        subject_ID = parse(Int, last(split(fsplt[sub_idx], '-')))
+        subject_id = parse(Int, last(split(fsplt[sub_idx], '-')))
 
         session_idx = findfirst(fi -> occursin("ses-",fi), fsplt)
         session = last(split(fsplt[session_idx], '-'))
@@ -66,7 +66,7 @@ function read_data_bipolar(files, cols; include_omissions=false)
         df_subj = CSV.read(f, DataFrame, types=String)
 
         df_subj.trial_index = Base.OneTo(nrow(df_subj))
-        df_subj.subject_id .= subject_ID
+        df_subj.subject_id .= subject_id
         df_subj.session .= session
         df_subj.run .= parse(Int, run)
 
@@ -98,10 +98,10 @@ function read_data_bipolar(files, cols; include_omissions=false)
     return df
 end
 
-function read_aggressiveness(df::DataFrame; normalize=true)
+function read_aggressiveness(df::DataFrame; zero_center=true)
     df_agr = CSV.read("./data/aggressiveness.csv", DataFrame)
 
-    if normalize
+    if zero_center
         return df_agr[df.trial_index, [:score]] .- mean(df_agr.score)
     else
         return df_agr[df.trial_index, [:score]]
