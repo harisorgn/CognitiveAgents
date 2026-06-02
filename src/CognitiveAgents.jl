@@ -2,13 +2,7 @@ module CognitiveAgents
 
 using Distributions
 
-using CommonRLInterface
-import CommonRLInterface: reset!, actions, observe, terminated, act!
-
-using Optimization
-using Optim
 using JuMP
-using Ipopt
 using MadNLP
 
 using DelimitedFiles: readdlm
@@ -36,14 +30,12 @@ using SpecialFunctions
 using HypothesisTests: EqualVarianceTTest, pvalue
 
 using UnPack
-using Serialization
 
 using CairoMakie
 using ColorSchemes
 
 include("utils.jl")
 include("read.jl")
-include("CategoryLearnEnv.jl")
 include("category_learn.jl")
 include("category_match.jl")
 include("faces_match.jl")
@@ -51,16 +43,14 @@ include("plot.jl")
 
 export read_data_bipolar, read_aggressiveness, read_data_psychopy, read_data_js
 export get_choices, get_correct_categories, get_stimuli, get_response_times
-export GridSearch, CLResult, CMResult, EMAgent, CategoryLearnEnv
-export objective, category_match, fit_CL, fit_CM, fit_CM, fit_faces, run_CL_task
-export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_group_accuracy
+export CLResult, CMResult, FacesResult, EMAgent, CategoryLearnEnv
+export fit_CL, fit_CM, fit_faces
+export CL_results_to_regressors, CM_results_to_regressors, faces_results_to_regressors, results_to_dataframe, spm_hrf_convolve
+export loglikelihood, run_trial!, run_task!, initialise_agent, get_categorization_rules
+export negative_loglikelihood
+export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_cumulative_RT, figure_accuracy
 export figure_regressor, figure_hrf_regressor, figure_combined_regressor
 export figure_CL_model, figure_CM_model, figure_faces_model
 export figure_CL_model_param_diff, figure_CM_model_param_diff, figure_faces_model_param_diff
-export results_to_regressors, results_to_dataframe, spm_hrf_convolve
-export fit_CL_bayes, SLP, hierarchical_SLP
-export loglikelihood, run_trial!, run_task!, initialise_agent, get_categorization_rules
-export negative_loglikelihood, category_learn, EMModel
-export get_results
 
 end 
