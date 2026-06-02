@@ -1,7 +1,7 @@
 using CognitiveAgents
 using Serialization
-using OptimizationOptimJL
 using DataFramesMeta
+using CSV
 
 cols = [
     :subject_id,
@@ -26,37 +26,27 @@ filter!(f -> (last(split(f,'.')) == "csv") && (occursin(task, f)), files)
 df = read_data_bipolar(files, cols)
 
 IDs = unique(df.subject_id)
-alg = Optim.IPNewton()
 
-run = 2
+run = 1
 session = "glc"
+res = CMResult[]
 for ID in IDs
     df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
 
     if !isempty(df_fit)
-        res = fit_CM(df_fit, alg)
-        serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
+        res_subj = fit_CM(df_fit)
+        push!(res, res_subj)
     end
 end
 
-session = "bhb"
-for ID in IDs
-    df_fit = @subset(df, :subject_id .== ID, :run .== run, :session .== session)
+df_res = results_to_dataframe(res)
+CSV.write("CM_model_params_$(session)_run_$(run).csv", df_res)
 
-    if !isempty(df_fit)
-        res = fit_CM(df_fit, alg)
-        serialize("CM_model_sub-$(ID)_ses-$(session)_run-$(run).jls", res)
-    end
-end
+CM_results_to_regressors(df_res, df)
 
-dir = joinpath("./results", "category_match")
-files = readdir(dir; join=true)
-res = deserialize.(files)
-df = results_to_dataframe(res)
+figure_accuracy(df, 10)
 
-figure_CM_model(df)
+figure_cumulative_RT(df)
 
-figure_CM_model_param_diff(df)
-
-
+figure_RT(df)
 
