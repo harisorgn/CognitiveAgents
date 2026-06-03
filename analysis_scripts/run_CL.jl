@@ -48,3 +48,9 @@ df_res = results_to_dataframe(res)
 CSV.write("CL_model_params_$(session)_run_$(run).csv", df_res)
 
 CL_results_to_regressors(df_res, df; σ_conv, grid_sz)
+
+figure_accuracy(df, 20)
+
+figure_cumulative_RT(df)
+
+figure_RT(df)
