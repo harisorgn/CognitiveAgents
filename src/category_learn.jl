@@ -114,11 +114,7 @@ function logprior(k, z, t; s=0)
     
     zₜ = last(z)
 
-    if k == zₜ
-        return log(sum(kernel.((t,), t_past[z .== k]))) + s
-    else
-        return log(sum(kernel.((t,), t_past[z .== k])))
-    end
+    return log(sum(kernel.((t,), t_past[z .== k]))) + s
 end
 
 function update_latent_factor!(zs, logpost)
