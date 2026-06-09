@@ -46,11 +46,9 @@ export get_choices, get_correct_categories, get_stimuli, get_response_times
 export CLResult, CMResult, FacesResult, EMAgent, CategoryLearnEnv
 export fit_CL, fit_CM, fit_faces
 export CL_results_to_regressors, CM_results_to_regressors, faces_results_to_regressors, results_to_dataframe, spm_hrf_convolve
-export loglikelihood, run_trial!, run_task!, initialise_agent, get_categorization_rules
+export loglikelihood, initialise_agent, get_categorization_rules
 export negative_loglikelihood
 export figure_psychophysics_CM, figure_psychophysics_faces, figure_RT, figure_RT_faces, figure_cumulative_RT, figure_accuracy
 export figure_regressor, figure_hrf_regressor, figure_combined_regressor
-export figure_CL_model, figure_CM_model, figure_faces_model
-export figure_CL_model_param_diff, figure_CM_model_param_diff, figure_faces_model_param_diff
 
 end 
