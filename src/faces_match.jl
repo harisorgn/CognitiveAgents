@@ -10,6 +10,12 @@ function add_data!(df, df_aggressive)
     df.score = df_aggressive.score
 end
 
+"""
+    FacesResult
+
+Container for a fitted drift-diffusion model on the faces matching task, including
+the JuMP solution object and subject/session/run identifiers.
+"""
 struct FacesResult
     sol
     subject_id
@@ -17,6 +23,14 @@ struct FacesResult
     run
 end
 
+"""
+    fit_faces(df; min_rt=0.2)
+
+Fit a drift-diffusion model (DDM) to `df::DataFrame` containing trial-by-trial data from the faces match task and return a `FacesResult`.
+
+Drift rates are modelled as a linear regression over face aggressiveness, with a slope and an intercept variable. 
+Trials with response time below `min_rt` seconds are excluded.
+"""
 function fit_faces(df; min_rt = 0.2, kwargs...)
     df_agr = read_aggressiveness(df; zero_center=true)
     add_data!(df, df_agr)
@@ -44,6 +58,13 @@ function fit_faces(df; min_rt = 0.2, kwargs...)
 end
 
 
+"""
+    results_to_dataframe(results::Vector{<:FacesResult})
+
+Convert a vector of `FacesResult` objects to a `DataFrame` with columns 
+`subject_id`, `run`, `session`, `α`, `τ`, `z`, `drift_intercept`, `drift_slope`, `drift_angry`, `drift_neutral`,
+and `drift_ambiguous`.
+"""
 function results_to_dataframe(results::Vector{<:FacesResult})
     df = DataFrame(
         subject_id = Int64[],
@@ -92,6 +113,15 @@ function results_to_dataframe(results::Vector{<:FacesResult})
     return df
 end
 
+"""
+    faces_results_to_regressors(df_res, df; trial_duration=4, T_sample=0.4)
+
+Compute time-resolved decision evidence regressors for each subject in `df_res` and write them to
+`faces_regress_sub-<id>_ses-<session>_run-<run>.csv`.
+
+The structure of `df_res` is a `DataFrame` where each row includes the fitted parameters 
+and subject/session/run identifiers for each subject.
+"""
 function faces_results_to_regressors(df_res, df; trial_duration=4, T_sample=0.4)
     for r in eachrow(df_res)
         df_fit = @subset(df, :subject_id .== r.subject_id, :run .== r.run, :session .== r.session)
