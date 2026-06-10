@@ -30,6 +30,12 @@ function negative_loglikelihood(β, P_lapse, dot_evidence::Vector{Matrix{Float64
     return -loglikelihood
 end
 
+"""
+    CMResult
+
+Container for a fitted category matching model, including the JuMP solution object
+and subject/session/run identifiers.
+"""
 struct CMResult
     sol
     subject_id
@@ -37,6 +43,13 @@ struct CMResult
     run
 end
 
+"""
+    fit_CM(df)
+
+Fit the category matching model to a `df::DataFrame` containing trial-by-trial data from the category match task and return a `CMResult`.
+
+Optimises decision temperature `β` and lapse rate `P_lapse` via MadNLP.
+"""
 function fit_CM(df)
     L = get_loglikelihood_dots(df)
     C = get_choices(df)
@@ -55,6 +68,15 @@ function fit_CM(df)
     return res
 end
 
+"""
+    CM_results_to_regressors(df_res, df_data; inter_dot_interval=0.55)
+
+Compute dot-by-dot choice probability regressors for each subject in `df_res` and write them to
+`CM_regress_sub-<id>_ses-<session>_run-<run>.csv`.
+
+The structure of `df_res` is a `DataFrame` where each row includes the fitted parameters 
+and subject/session/run identifiers for each subject.
+"""
 function CM_results_to_regressors(df_res, df_data; inter_dot_interval = 0.55)
     for r in eachrow(df_res)
         df_fit = @subset(df_data, :subject_id .== r.subject_id, :run .== r.run, :session .== r.session)
@@ -90,6 +112,12 @@ function CM_results_to_regressors(df_res, df_data; inter_dot_interval = 0.55)
     end
 end
 
+"""
+    results_to_dataframe(results::Vector{<:CMResult})
+
+Convert a vector of `CMResult` objects to a `DataFrame` with columns
+`subject_id`, `run`, `session`, `β`, and `P_lapse`.
+"""
 function results_to_dataframe(results::Vector{<:CMResult})
     df = DataFrame(
         subject_id = Int64[],
