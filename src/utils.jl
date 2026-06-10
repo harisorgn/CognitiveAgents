@@ -29,14 +29,30 @@ end
 
 get_corrects(df) = map(x -> occursin("True", x) ? true : false, df.correct) 
 
+"""
+    get_choices(df)
+
+Return a `Vector{Bool}` indicating whether each trial response was `"right"`.
+"""
 get_choices(df) = occursin.("right", df.response)
 
 get_choicesp1(df) = Int.(occursin.("right", df.response)) .+ 1
 
+"""
+    get_correct_categories(df)
+
+Return a vector of correct category indicators (0 or 1) where 1 denotes a `"right"` correct response.
+"""
 get_correct_categories(df::DataFrame) = Int.(occursin.("right", df.correct_response))
 
 get_corrects(df::DataFrame) = return eltype(df.correct) <: Bool ? df.correct : parse.(Bool, df.correct)
 
+"""
+    get_response_times(df)
+
+Return a `Vector{Union{Float64, Missing}}` of response times parsed from `df.response_time`.
+Entries marked as missing or `"None"` are returned as `missing`.
+"""
 function get_response_times(df)
     RT = df.response_time
     r = Vector{Union{Float64, Missing}}(undef, length(RT))
@@ -54,6 +70,15 @@ function get_response_times(df)
     return r
 end
 
+"""
+    get_stimuli(df; σ_conv=1, grid_sz=(50,50))
+
+Load, resize, and Gaussian-convolve stimuli from `df`, returning a `D × N` matrix normalised to [0, 1].
+
+# Arguments
+- `σ_conv`: standard deviation of the Gaussian convolution kernel.
+- `grid_sz`: pixel dimensions to which each image is resized.
+"""
 function get_stimuli(df; σ_conv=1, grid_sz=(50,50))
     X = mapreduce(hcat, eachrow(df)) do r
         set = parse(Int, r.set)
@@ -147,6 +172,11 @@ function spm_hrf(RT; p=[6, 16, 1, 1, 6, 0, 32], T=16)
     return hrf
 end
 
+"""
+    spm_hrf_convolve(stimulus, RT=0.8)
+
+Convolve `stimulus` with the SPM double-gamma hemodynamic response function sampled at `RT` seconds.
+"""
 function spm_hrf_convolve(stimulus, RT=0.8)
     hrf = spm_hrf(RT)
     final = conv(hrf, stimulus)
