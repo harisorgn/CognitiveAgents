@@ -297,7 +297,7 @@ end
 """
     fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β=100.0, ub_s=100.0)
 
-Fit the category learning EM model to `df` and return a `CLResult`.
+Fit the category learning EM model to `df::DataFrame` containing trial-by-trial data from the category learning task and return a `CLResult`.
 
 Optimises `η`, `β`, and `s` via MadNLP. `ub_β` and `ub_s` scale the optimiser's
 [0, 1] variables to their true parameter ranges.
