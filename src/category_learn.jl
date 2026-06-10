@@ -1,5 +1,17 @@
 abstract type AbstractRegressor end
 
+"""
+    EMAgent
+
+Expectation-Maximisation agent for the category learning task.
+
+Maintains an expanding set of latent categories, each with a weight vector and
+sufficient statistics, updated trial-by-trial via E and M steps.
+
+References : 
+- Samuel J Gershman Marie-H Monfils Kenneth A Norman Yael Niv (2017) The computational nature of memory modification, eLife 6:e23763.
+- Gershman, S.J., Hartley, C.A. (2015) Individual differences in learning predict the return of fear. Learn Behav 43, 243–250.
+"""
 mutable struct EMAgent{T, R <: AbstractRegressor}
     W::Matrix{T}
     S̄::Vector{Matrix{T}}
@@ -40,6 +52,12 @@ mutable struct EMAgent{T, R <: AbstractRegressor}
     end
 end
 
+"""
+    CLResult
+
+Container for a fitted category learning model, including the JuMP solution
+object, image processing parameters, and subject/session/run identifiers.
+"""
 struct CLResult
     sol
     image_size
@@ -199,6 +217,11 @@ function M_step!(agent::EMAgent, stim, correct_cat)
     end
 end
 
+"""
+    loglikelihood(agent, stim, choice_cat)
+
+Return the log-likelihood of `choice_cat` given `stim`, marginalised over the agent's latent categories.
+"""
 function loglikelihood(agent::EMAgent, stim::AbstractVector, choice_cat::Real)
     @unpack W, logpost_stim = agent
 
@@ -240,8 +263,27 @@ function loglikelihood!(agent::EMAgent, S::AbstractMatrix, choices::AbstractVect
     return L_data
 end
 
+"""
+    initialise_agent(X; η=0.1, ηₓ=0.05, α=1.0, β=1.0, σ²=12, s=0.0)
+
+Return an `EMAgent` initialised for stimulus matrix `X`.
+
+# Arguments
+- `η`: weight learning rate.
+- `ηₓ`: stimulus mean learning rate.
+- `α`: new-category prior concentration.
+- `β`: decision temperature.
+- `σ²`: stimulus likelihood variance.
+- `s`: stickiness bias toward the previously assigned category.
+"""
 initialise_agent(X; η=0.1, ηₓ=0.05, α=1.0, β=1.0, σ²=12, s=0.0) = EMAgent(X; η, ηₓ, α, β, σ², s)
 
+"""
+    negative_loglikelihood(η, β, s, X, choices, corrects; ub_β=100.0, ub_s=100.0, N_loops=1)
+
+Return the negative log-likelihood of `choices` given stimuli `X` and `corrects` for an
+EM agent with parameters `η`, `β` (scaled by `ub_β`), and `s` (scaled by `ub_s`).
+"""
 function negative_loglikelihood(η, β, s, X::AbstractMatrix, choices::AbstractVector, corrects::AbstractVector; ub_β = 100.0, ub_s = 100.0, N_loops=1)
     β = β * ub_β
     s = s * ub_s
@@ -252,6 +294,14 @@ function negative_loglikelihood(η, β, s, X::AbstractMatrix, choices::AbstractV
 end
 
 
+"""
+    fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β=100.0, ub_s=100.0)
+
+Fit the category learning EM model to `df` and return a `CLResult`.
+
+Optimises `η`, `β`, and `s` via MadNLP. `ub_β` and `ub_s` scale the optimiser's
+[0, 1] variables to their true parameter ranges.
+"""
 function fit_CL(df; σ_conv=5, grid_sz=(50,50), ub_β = 100.0, ub_s = 100.0, kwargs...)
     choices = get_choices(df)
     corrects = get_correct_categories(df)
@@ -293,6 +343,15 @@ function EM_learning!(agent::EMAgent, S::AbstractMatrix, corrects::AbstractVecto
     end
 end
 
+"""
+    CL_results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
+
+Compute trial-by-trial model regressors for each subject in `df_res` and write them to
+`CL_regress_sub-<id>_ses-<session>_run-<run>.csv`.
+
+The structure of `df_res` is a `DataFrame` where each row includes the fitted parameters 
+and subject/session/run identifiers for each subject.
+"""
 function CL_results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
     for r in eachrow(df_res)
         df_regress = DataFrame(
@@ -356,6 +415,12 @@ function CL_results_to_regressors(df_res, df_data; σ_conv=1, grid_sz=(50,50))
     end
 end
 
+"""
+    results_to_dataframe(results::Vector{<:CLResult}; ub_β=100.0, ub_s=100.0)
+
+Convert a vector of `CLResult` objects to a `DataFrame` with columns
+`subject_id`, `run`, `session`, `η`, `β`, and `s`.
+"""
 function results_to_dataframe(results::Vector{<:CLResult}; ub_β = 100.0, ub_s = 100.0)
     df = DataFrame(
         subject_id = Int64[],
@@ -384,6 +449,12 @@ function results_to_dataframe(results::Vector{<:CLResult}; ub_β = 100.0, ub_s =
     return df
 end
 
+"""
+    get_categorization_rules(df_data, df_params, ID, session, run; σ_conv=5, grid_sz=(50,50))
+
+Return the trial-by-trial latent category assignments `z` inferred by the EM agent for
+subject `ID`, `session`, and `run`, using parameters from `df_params`.
+"""
 function get_categorization_rules(df_data::DataFrame, df_params::DataFrame, ID, session, run; σ_conv=5, grid_sz=(50,50))
     df_data_subj = @subset(df_data, :subject_id.==ID, :run.==run, :session.==session)
     df_params_subj = @subset(df_params, :subject_id.==ID, :run.==run, :session.==session)
