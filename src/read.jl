@@ -3,6 +3,12 @@ chunk(arr, n) = [arr[i:min(i + n - 1, end)] for i in 1:n:length(arr)]
 
 omissions(df) = count(ismissing.(df[!, :response]))
 
+"""
+    read_data_js(files, cols)
+
+Read jsPsych experiment data from `files`, selecting `cols`, and return a combined `DataFrame`.
+Subjects with more than 10% missing responses are excluded.
+"""
 function read_data_js(files, cols)
     df = DataFrame()
     for f in files
@@ -29,26 +35,14 @@ function read_data_js(files, cols)
     return df
 end
 
-function read_data_psychopy(files, cols)
-    df = DataFrame()
-    for f in files
-        df_subj = CSV.read(f, DataFrame, types=String)
-        if !("subject_id" in names(df_subj)) || all(ismissing.(df_subj.subject_id))
-            df_subj.subject_id .= string(rand(1001:9999))
-        end
-        df_subj.response[ismissing.(df_subj.response)] .= ""
-        df_subj.correct[ismissing.(df_subj.correct)] .= "0"
+"""
+    read_data_bipolar(files, cols; include_omissions=false)
 
-        df_subj.response_time[ismissing.(df_subj.response_time)] .= "4.0"
-        
-        if (omissions(df_subj) / nrow(df_subj) <= 0.1)
-            append!(df, df_subj[:, cols])
-        end
-    end
+Read bipolar study data, as conducted via PsychoPy, from `files`, selecting `cols`, and return a combined `DataFrame`.
+Subject ID, session, and run are parsed from the filename. 
 
-    return df
-end
-
+Set `include_omissions=true` to retain trials with missing response times.
+"""
 function read_data_bipolar(files, cols; include_omissions=false)
     df = DataFrame()
     
@@ -98,6 +92,12 @@ function read_data_bipolar(files, cols; include_omissions=false)
     return df
 end
 
+"""
+    read_aggressiveness(df; zero_center=true)
+
+Return aggressiveness scores for the trials in `df` from `./data/aggressiveness.csv`.
+Set `zero_center=false` to return raw scores instead of mean-centred ones.
+"""
 function read_aggressiveness(df::DataFrame; zero_center=true)
     df_agr = CSV.read("./data/aggressiveness.csv", DataFrame)
 
