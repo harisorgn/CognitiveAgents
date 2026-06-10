@@ -22,6 +22,14 @@ function plot_accuracy!(ax::Axis, gdf::GroupedDataFrame, N_trials_per_set, N_sub
     end
 end
 
+"""
+    figure_accuracy(df, N_trials_per_set=20; name="CL_group_acc", save_fig=false, title="")
+
+Return a figure of mean group accuracy over trials, grouped by stimulus set.
+
+- N_trials_per_set=20 for the category learning task
+- N_trials_per_set=10 for the category matching task
+"""
 function figure_accuracy(df, N_trials_per_set=20; name="CL_group_acc", save_fig=false, title="")
     colormap = ColorSchemes.seaborn_bright.colors
 
@@ -70,6 +78,11 @@ function plot_cumulative_RT!(ax::Axis, gdf::GroupedDataFrame, xs; colormap=Color
     band!(ax, xs, μ .- sem, μ .+ sem; color = (colormap[2], 0.3))
 end
 
+"""
+    figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="")
+
+Return a figure of the group-average cumulative response-time distribution.
+"""
 function figure_cumulative_RT(df, xlims=(0,10); save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
     
@@ -119,6 +132,11 @@ function plot_RT!(ax::Axis, gdf::GroupedDataFrame, edges; color=:black, bin_size
     errorbars!(ax, xs, μ_counts, sem_counts; color, whiskerwidth = 12)
 end
 
+"""
+    figure_RT(df; bin_size=0.5, save_fig=false, name="", title="")
+
+Return a figure of the group-average response-time histogram with bin width `bin_size`.
+"""
 function figure_RT(df; bin_size=0.5, save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
     
@@ -190,6 +208,11 @@ function plot_RT_faces!(ax, res::FacesResult, scores; colormap=ColorSchemes.seab
     errorbars!(ax, scores, μ_RT_score, sem_RT_score; color, whiskerwidth = 12)
 end
 
+"""
+    figure_RT_faces(df; save_fig=false, name="", title="")
+
+Return a figure of mean response time as a function of face aggressiveness.
+"""
 function figure_RT_faces(df::DataFrame ; save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
     
@@ -301,6 +324,11 @@ function plot_psychophysics_faces!(ax, res::FacesResult, scores; color=:black, k
     errorbars!(ax, scores, μ_acc_score, sem_acc_score; color)
 end
 
+"""
+    figure_psychophysics_faces(df; save_fig=false, name="", title="")
+
+Return a figure of the probability of a "friend" response as a function of face aggressiveness.
+"""
 function figure_psychophysics_faces(df::DataFrame; save_fig=false, name="", title="")
     colormap = ColorSchemes.seaborn_bright.colors
 
@@ -401,6 +429,11 @@ function plot_psychophysics_CM!(ax::Axis, gdf::GroupedDataFrame, edges; color)
     errorbars!(ax, edges[1:end-1], μ_P, sem_P; color) 
 end
 
+"""
+    figure_psychophysics_CM(df; N_points=15, name="", save_fig=false)
+
+Return a figure of the category matching psychometric curve (P(category 2) vs. log-likelihood dot (evidence) difference between the two categories).
+"""
 function figure_psychophysics_CM(df::DataFrame; N_points=15, name="", save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
@@ -423,6 +456,11 @@ function figure_psychophysics_CM(df::DataFrame; N_points=15, name="", save_fig=f
     f
 end
 
+"""
+    figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
+
+Return a figure displaying `val_regress` regressor/timeseries as a staircase at the event times in `t_regress`.
+"""
 function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
 
@@ -444,6 +482,11 @@ function figure_regressor(t_regress, val_regress; pulse_width=1, regressor_name=
     f
 end
 
+"""
+    figure_hrf_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
+
+Return a figure showing a `val_regress` regressor/timeseries after convolution with the SPM hemodynamic response function.
+"""
 function figure_hrf_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     
     ts = 0:pulse_width:(maximum(t_regress) + 4*pulse_width)
@@ -469,6 +512,11 @@ function figure_hrf_regressor(t_regress, val_regress; pulse_width=1, regressor_n
     f
 end
 
+"""
+    figure_combined_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
+
+Return a figure overlaying the raw and HRF-convolved versions of regressor/timeseries `val_regress`.
+"""
 function figure_combined_regressor(t_regress, val_regress; pulse_width=1, regressor_name="", name="", save_fig=false)
     colormap = ColorSchemes.seaborn_bright.colors
 
