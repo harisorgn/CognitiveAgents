@@ -464,8 +464,8 @@ function get_categorization_rules(df_data::DataFrame, df_params::DataFrame, ID, 
     S = get_stimuli(df_data_subj; σ_conv, grid_sz)
 
     @assert nrow(df_params_subj)==1
-    p = Vector(df_params_subj[1, [:η, :ηₓ, :α, :β, :σ², :s]])
-    ag = initialise_agent(S; η=p[1], ηₓ=p[2], α=p[3], β=p[4], σ²=p[5], s=p[6])
+    p = Vector(df_params_subj[1, [:η, :β, :s]])
+    ag = initialise_agent(S; η=p[1], β=p[2], s=p[3])
     loglikelihood!(ag, S, choices, corrects)
 
     return ag.z
